@@ -59,6 +59,21 @@ class VendaService
                     ->get();
 
                 if ($animais->count() !== count($animalIds)) {
+                    // Achado real, confirmado contra MySQL (Spike 007, Ataque
+                    // A — bovino-lab): uma transação CONCORRENTE com a MESMA
+                    // chave_idempotencia pode ter vendido esses animais
+                    // primeiro. Isso não é pedido inválido, é reenvio que
+                    // perdeu a corrida pelo lock — sem esta checagem, INV-028
+                    // se rompe sob concorrência real (SQLite nunca provou
+                    // isso, porque lockForUpdate() é um no-op nesse driver).
+                    $concorrente = Venda::where('fazenda_id', $fazendaId)
+                        ->where('chave_idempotencia', $chaveIdempotencia)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($concorrente) {
+                        return ['reenvio_detectado' => true, 'venda' => $concorrente];
+                    }
+
                     throw new DomainException(
                         'Um ou mais animais pedidos não pertencem a esta Fazenda ou já não estão ativos — nenhum efeito parcial aplicado.'
                     );
