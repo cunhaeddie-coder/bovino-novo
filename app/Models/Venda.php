@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Builders\VendaBuilder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -41,5 +43,10 @@ class Venda extends Model
     public function original(): BelongsTo
     {
         return $this->belongsTo(Venda::class, 'venda_original_id');
+    }
+
+    public function newEloquentBuilder($query): Builder
+    {
+        return new VendaBuilder($query);
     }
 }

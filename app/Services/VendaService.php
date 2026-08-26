@@ -43,7 +43,10 @@ class VendaService
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
-        if ($existente = Venda::where('chave_idempotencia', $chaveIdempotencia)->first()) {
+        // chave_idempotencia é escopada por Fazenda (revisão adversarial,
+        // 26/08/2026) — uma colisão de chave com OUTRA Fazenda nunca pode
+        // devolver a Venda de outra Fazenda (isso seria vazamento via INV-029).
+        if ($existente = Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->first()) {
             return ['reenvio_detectado' => true, 'venda' => $existente];
         }
 
@@ -111,7 +114,7 @@ class VendaService
             });
         } catch (QueryException $e) {
             if ($this->violacaoDeUnicidade($e)) {
-                return ['reenvio_detectado' => true, 'venda' => Venda::where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
+                return ['reenvio_detectado' => true, 'venda' => Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
             }
             throw $e;
         }
@@ -120,6 +123,14 @@ class VendaService
     /**
      * Correção do fato Venda (VERTICAL-VENDA.md §3c / INV-026). NUNCA faz
      * UPDATE na venda original — cria um novo registro que a referencia.
+     *
+     * Revisão adversarial (26/08/2026): $novosAnimalIds só pode REMOVER
+     * animais do conjunto original, nunca introduzir um id que a venda
+     * original nunca teve — VERTICAL-VENDA.md §3c/Caso B só descreve correção
+     * como redução (28→26), nunca expansão, e um id não pertencente ao
+     * original nunca passou por nenhuma checagem de disponibilidade/Fazenda.
+     * Aceitar isso sem validar permitia "anexar" um animal de qualquer
+     * Fazenda a uma correção sem nunca tocar o registro real desse animal.
      */
     public function corrigir(int $usuarioId, int $vendaOriginalId, array $novosAnimalIds, float $novoValorBruto, string $chaveIdempotencia): array
     {
@@ -128,12 +139,18 @@ class VendaService
             throw new DomainException("Venda original #{$vendaOriginalId} não encontrada ou sem relação com a Fazenda do usuário {$usuarioId}.");
         }
         $fazendaId = $original->fazenda_id;
+        $idsOriginais = $original->animal_ids;
 
-        if ($existente = Venda::where('chave_idempotencia', $chaveIdempotencia)->first()) {
+        if (array_diff($novosAnimalIds, $idsOriginais)) {
+            throw new DomainException(
+                'Correção só pode remover animais da venda original, nunca incluir um animal que não fazia parte dela.'
+            );
+        }
+
+        if ($existente = Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->first()) {
             return ['reenvio_detectado' => true, 'venda' => $existente];
         }
 
-        $idsOriginais = $original->animal_ids;
         $idsQueSaem = array_values(array_diff($idsOriginais, $novosAnimalIds));
 
         try {
@@ -192,7 +209,7 @@ class VendaService
             });
         } catch (QueryException $e) {
             if ($this->violacaoDeUnicidade($e)) {
-                return ['reenvio_detectado' => true, 'venda' => Venda::where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
+                return ['reenvio_detectado' => true, 'venda' => Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
             }
             throw $e;
         }
