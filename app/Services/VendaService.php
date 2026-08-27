@@ -84,8 +84,17 @@ class VendaService
                 $idsVendidos = $animais->pluck('id')->values()->all();
 
                 // INV-001 — recálculo do(s) lote(s) de origem, proporcional ao que saiu.
+                // VERTICAL-COMPRA.md §9 — animal sem Lote (comprado individualmente,
+                // custo_aquisicao próprio) não passa pela derivação de agregado: seu
+                // custo já É o CPV dele, direto, nunca dividido de um lote que não existe.
                 $cpv = 0.0;
-                foreach ($animais->groupBy('lote_id') as $loteId => $doLote) {
+
+                $semLote = $animais->whereNull('lote_id');
+                if ($semLote->isNotEmpty()) {
+                    $cpv += round((float) $semLote->sum('custo_aquisicao'), 2);
+                }
+
+                foreach ($animais->whereNotNull('lote_id')->groupBy('lote_id') as $loteId => $doLote) {
                     $lote = Lote::where('id', $loteId)->lockForUpdate()->firstOrFail();
                     $qtdSaida = $doLote->count();
                     $custoUnitario = $lote->custo_aquisicao / $lote->qtd_animais;
