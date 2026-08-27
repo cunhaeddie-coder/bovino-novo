@@ -173,8 +173,16 @@ class VendaService
                 $custoUnitarioOriginal = $original->cpv / count($idsOriginais);
 
                 if ($idsQueSaem) {
+                    // bovino-lab/spikes/007-concorrencia-real-mysql/run_correcao.php,
+                    // Ataque F — confirmado por execução real: sem o filtro
+                    // por status, duas correções concorrentes devolvendo o
+                    // MESMO animal creditavam o lote duas vezes (INV-001
+                    // violado — o lote passava a "ter" um animal a mais do
+                    // que fisicamente existe). Espelha o filtro que
+                    // registrar() já usa pro caminho inverso (vender).
                     $animaisQueVoltam = Animal::where('fazenda_id', $fazendaId)
                         ->whereIn('id', $idsQueSaem)
+                        ->where('status', 'vendido')
                         ->lockForUpdate()
                         ->get();
 

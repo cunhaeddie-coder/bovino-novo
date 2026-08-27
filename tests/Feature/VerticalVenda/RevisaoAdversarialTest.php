@@ -130,4 +130,39 @@ class RevisaoAdversarialTest extends TestCase
 
         $this->assertEquals(100.00, $venda->fresh()->valor_bruto);
     }
+
+    /**
+     * Achado 4 (alto) — bovino-lab/spikes/007-concorrencia-real-mysql/run_correcao.php,
+     * Ataque F. corrigir() não filtrava por status ao devolver animal pro
+     * ativo — duas correções distintas (mesma Fazenda, mesma venda original)
+     * que incluem o MESMO animal no conjunto "que sai" creditavam o lote
+     * duas vezes pelo mesmo animal físico (violação de INV-001). Reproduzível
+     * sem concorrência real — é bug de lógica, a corrida só o tornou óbvio.
+     */
+    public function test_duas_correcoes_da_mesma_venda_nao_creditam_o_mesmo_animal_duas_vezes_no_lote(): void
+    {
+        $fazenda = Fazenda::create(['nome' => 'A'])->id;
+        $usuario = Usuario::create(['nome' => 'José'])->id;
+        Papel::create(['usuario_id' => $usuario, 'fazenda_id' => $fazenda, 'papel' => 'dono']);
+
+        $lote = Lote::create(['fazenda_id' => $fazenda, 'qtd_animais' => 5, 'custo_aquisicao' => 500])->id;
+        $animais = [];
+        for ($i = 0; $i < 5; $i++) {
+            $animais[] = Animal::create(['fazenda_id' => $fazenda, 'lote_id' => $lote, 'status' => 'ativo'])->id;
+        }
+        [$a1, $a2, $a3, $a4, $a5] = $animais;
+
+        $vendas = app(VendaService::class);
+        $venda = $vendas->registrar($usuario, $fazenda, $animais, 500.00, 'venda-original');
+
+        // Duas correções SEQUENCIAIS (nem precisa de corrida real pra provar
+        // a lógica) pedindo a MESMA remoção — a5 sai nas duas.
+        $vendas->corrigir($usuario, $venda['venda']->id, [$a1, $a2, $a3, $a4], 400.00, 'correcao-1');
+        $vendas->corrigir($usuario, $venda['venda']->id, [$a1, $a2, $a3, $a4], 400.00, 'correcao-2');
+
+        $loteDepois = Lote::find($lote);
+        $this->assertSame(1, $loteDepois->qtd_animais, 'a5 é um único animal físico — só pode creditar o lote uma vez, mesmo com duas correções pedindo a mesma coisa');
+        $this->assertEqualsWithDelta(100.00, (float) $loteDepois->custo_aquisicao, 0.01);
+        $this->assertSame('ativo', Animal::find($a5)->status);
+    }
 }
