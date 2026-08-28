@@ -88,5 +88,8 @@ class CompraIdempotenciaSequencialTest extends TestCase
         $this->assertSame(2, CompraItem::count(), 'itens_nunca_duplicados');
         $this->assertSame(1, ObrigacaoFinanceira::where('compra_id', $r1['compra']->id)->count(), 'obrigacao_nunca_duplicada');
         $this->assertSame(1, EventoDominio::where('fazenda_id', $this->fazenda)->where('tipo', 'compra_concluida')->count(), 'evento_nunca_duplicado');
+        // Revisão de fronteira (27/08/2026) — faltava confirmar que o valor
+        // permanece intocado, não só que a contagem de linhas não muda.
+        $this->assertEqualsWithDelta(11000.00, (float) $r1['compra']->fresh()->valor_total, 0.01, 'valor_total_intocado_apos_reenvios');
     }
 }

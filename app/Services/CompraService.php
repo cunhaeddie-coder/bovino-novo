@@ -6,6 +6,7 @@ use App\Models\Animal;
 use App\Models\Compra;
 use App\Models\CompraItem;
 use App\Models\EventoDominio;
+use App\Models\Fornecedor;
 use App\Models\ObrigacaoFinanceira;
 use App\Models\Usuario;
 use DomainException;
@@ -52,6 +53,17 @@ class CompraService
 
         if (empty($valoresPorAnimal)) {
             throw new DomainException('Uma Compra precisa de pelo menos um animal.');
+        }
+
+        // Revisão de fronteira (27/08/2026) — achado real: sem esta checagem,
+        // um fornecedor_id inexistente violava a FK em compras.fornecedor_id
+        // dentro da transação, e violacaoDeUnicidade() confundia isso com
+        // colisão de chave_idempotencia (as duas retornam SQLSTATE 23000) —
+        // o chamador recebia ModelNotFoundException, não um erro que diz o
+        // que realmente aconteceu. Checado explicitamente, antes da
+        // transação, mesmo padrão de garantirRelacaoComFazenda().
+        if (! Fornecedor::find($fornecedorId)) {
+            throw new DomainException("Fornecedor #{$fornecedorId} não encontrado.");
         }
 
         try {
