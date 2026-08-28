@@ -15,4 +15,9 @@ class Fornecedor extends Model
     {
         return $this->hasMany(Compra::class);
     }
+
+    public function comprasInsumo(): HasMany
+    {
+        return $this->hasMany(CompraInsumo::class);
+    }
 }
