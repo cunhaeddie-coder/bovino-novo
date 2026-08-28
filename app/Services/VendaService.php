@@ -43,6 +43,13 @@ class VendaService
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
+        // Gate de Decisão de Domínio do Vertical Compra (27/08/2026) —
+        // correção simétrica: a mesma lacuna (chave vazia aceita
+        // silenciosamente) existia aqui também, nunca testada.
+        if (trim($chaveIdempotencia) === '') {
+            throw new DomainException('chave_idempotencia não pode ser vazia.');
+        }
+
         // chave_idempotencia é escopada por Fazenda (revisão adversarial,
         // 26/08/2026) — uma colisão de chave com OUTRA Fazenda nunca pode
         // devolver a Venda de outra Fazenda (isso seria vazamento via INV-029).
@@ -158,6 +165,12 @@ class VendaService
      */
     public function corrigir(int $usuarioId, int $vendaOriginalId, array $novosAnimalIds, float $novoValorBruto, string $chaveIdempotencia): array
     {
+        // Gate de Decisão de Domínio do Vertical Compra (27/08/2026) —
+        // mesma correção simétrica de registrar().
+        if (trim($chaveIdempotencia) === '') {
+            throw new DomainException('chave_idempotencia não pode ser vazia.');
+        }
+
         $original = $this->buscar($usuarioId, $vendaOriginalId);
         if (! $original) {
             throw new DomainException("Venda original #{$vendaOriginalId} não encontrada ou sem relação com a Fazenda do usuário {$usuarioId}.");

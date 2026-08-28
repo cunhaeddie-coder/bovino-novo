@@ -47,12 +47,32 @@ class CompraService
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
+        // Gate de Decisão de Domínio (27/08/2026) — chave_idempotencia vazia
+        // recusada, mesma correção simétrica em VendaService. Não é sobre
+        // formato: é que uma string vazia nunca foi gerada de propósito por
+        // nenhum caller real, mais provável de ser erro de integração.
+        if (trim($chaveIdempotencia) === '') {
+            throw new DomainException('chave_idempotencia não pode ser vazia.');
+        }
+
         if ($existente = Compra::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->first()) {
             return ['reenvio_detectado' => true, 'compra' => $existente];
         }
 
         if (empty($valoresPorAnimal)) {
             throw new DomainException('Uma Compra precisa de pelo menos um animal.');
+        }
+
+        // Gate de Decisão de Domínio (27/08/2026) — declaração direta do
+        // produtor: uma aquisição sem pagamento não é o fato Compra, é um
+        // fato diferente (Doação — MAPA-DOMINIO.md, conceito novo, fora de
+        // escopo deste vertical). Preço <= 0 nunca é uma Compra válida.
+        foreach ($valoresPorAnimal as $valor) {
+            if ($valor <= 0) {
+                throw new DomainException(
+                    "Compra exige preço positivo por animal (recebido: {$valor}). Aquisição sem pagamento é um fato diferente (Doação), fora do corte mínimo deste vertical."
+                );
+            }
         }
 
         // Revisão de fronteira (27/08/2026) — achado real: sem esta checagem,
