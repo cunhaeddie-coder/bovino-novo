@@ -14,7 +14,7 @@ use App\Models\Usuario;
 use App\Services\CompraService;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use LogicException;
+use Illuminate\Support\Exceptions\MathException;
 use Tests\TestCase;
 
 /**
@@ -64,17 +64,37 @@ class CompraFronteirasTest extends TestCase
     }
 
     /**
-     * Fronteira transacional — a mais importante da revisão. Um Animal
-     * criado com custo_aquisicao=null dispara o guard de Animal::booted()
-     * (lote_id XOR custo_aquisicao) DEPOIS que Compra + 2 Animais + seus
-     * CompraItens já foram escritos na mesma transação. Confirma rollback
-     * real: se qualquer etapa falha, absolutamente nada fica persistido.
+     * Fronteira transacional — a mais importante da revisão. Restaurada
+     * (28/08/2026): a versão original deste teste usava `null` como preço
+     * pra disparar o guard de Animal::booted() (lote_id XOR
+     * custo_aquisicao) DEPOIS de 2 Animais válidos já escritos — mas a
+     * validação de preço<=0 (Gate de Decisão de Domínio, mesmo dia)
+     * passou a interceptar `null` ANTES da transação (`null <= 0` é
+     * `true` em PHP), e o teste só continuava verde porque
+     * `DomainException` é subclasse de `LogicException` no PHP —
+     * deixou de exercitar rollback real, achado registrado em
+     * `VERTICAL-COMPRA.md §15`.
+     *
+     * `NAN` restaura o mecanismo sem inventar nada novo: `NAN <= 0` é
+     * `false` em PHP (qualquer comparação com NAN é falsa), então
+     * atravessa a validação de preço sem ser barrado — igual ao `null`
+     * original atravessava antes de existir aquela validação. Dentro da
+     * transação, `array_sum`/`round` com `NAN` não derruba
+     * `Compra::create()` (o cast decimal:2 de `valor_total` tolera),
+     * mas `Animal::create(['custo_aquisicao' => NAN])` do 3º item
+     * genuinamente falha — `Illuminate\Support\Exceptions\MathException`
+     * ("Unable to cast value to a decimal"), que estende `RuntimeException`,
+     * sem nenhuma relação com `LogicException`/`DomainException`.
+     * Confirmado por execução real, reproduzido 3x: falha depois que
+     * Compra + 2 Animais + seus CompraItens já foram escritos na mesma
+     * transação — volta a provar rollback genuíno, não recusa
+     * pré-transação.
      */
     public function test_falha_no_terceiro_animal_reverte_a_transacao_inteira(): void
     {
         $this->assertThrows(
-            fn () => $this->compras->registrar($this->jose, $this->fazenda, $this->marilia, [5000.00, 3000.00, null], '2026-01-01', 'compra-rollback'),
-            LogicException::class
+            fn () => $this->compras->registrar($this->jose, $this->fazenda, $this->marilia, [5000.00, 3000.00, NAN], '2026-01-01', 'compra-rollback'),
+            MathException::class
         );
 
         $this->assertSame(0, Compra::count(), 'compra_nao_persistida');

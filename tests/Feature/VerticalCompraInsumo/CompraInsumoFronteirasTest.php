@@ -14,6 +14,7 @@ use App\Models\Usuario;
 use App\Services\CompraInsumoService;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Exceptions\MathException;
 use Tests\TestCase;
 
 /**
@@ -119,6 +120,45 @@ class CompraInsumoFronteirasTest extends TestCase
         $this->assertSame(0, CompraInsumo::count(), 'compra_nao_persistida');
         $this->assertSame(0, CompraInsumoItem::count(), 'itens_nao_persistidos');
         $this->assertSame(1, Insumo::count(), 'nem_o_sal_que_seria_valido_fica_so_o_fosbovi_preexistente_permanece');
+        $this->assertSame(0, ObrigacaoFinanceira::count(), 'obrigacao_nao_persistida');
+        $this->assertSame(0, EventoDominio::count(), 'evento_nao_persistido');
+    }
+
+    /**
+     * Fronteira transacional — restaurada (28/08/2026), mesma dívida de
+     * evidência já registrada em `VERTICAL-COMPRA.md §15` pra Compra de
+     * Animal: os pre-checks sequenciais (nome duplicado, insumo_id
+     * duplicado) fecham todo caminho de falha malformada ANTES da
+     * transação, deixando nenhum mecanismo forçável pra provar rollback
+     * genuíno com um valor "recusável".
+     *
+     * `NAN` restaura sem inventar nada novo: `NAN <= 0` é `false` em PHP,
+     * atravessa a validação de quantidade/valor sem ser barrado. Dentro
+     * da transação, o primeiro item (Sal) é criado normalmente — Insumo +
+     * CompraInsumoItem escritos — e só o segundo item (Fosbovi, quantidade
+     * NAN) falha genuinamente ao tentar `Insumo::create()` com o cast
+     * decimal:2: `Illuminate\Support\Exceptions\MathException`, sem
+     * nenhuma relação com `DomainException`/`LogicException`. Confirmado
+     * por execução real, reproduzido 3x — falha depois de escrita parcial
+     * real, volta a provar rollback genuíno.
+     */
+    public function test_falha_no_segundo_item_reverte_a_transacao_inteira(): void
+    {
+        $this->assertThrows(
+            fn () => $this->compras->registrar(
+                $this->jose, $this->fazenda, $this->marilia,
+                [
+                    ['insumo_novo' => ['nome' => 'Sal Branco 25kg'], 'quantidade' => 80, 'valor_unitario' => 17.99],
+                    ['insumo_novo' => ['nome' => 'Fosbovi Advance 25kg'], 'quantidade' => NAN, 'valor_unitario' => 220.00],
+                ],
+                '2026-01-01', 'compra-rollback'
+            ),
+            MathException::class
+        );
+
+        $this->assertSame(0, CompraInsumo::count(), 'compra_nao_persistida');
+        $this->assertSame(0, CompraInsumoItem::count(), 'itens_nao_persistidos');
+        $this->assertSame(0, Insumo::count(), 'nem_o_sal_que_seria_valido_fica');
         $this->assertSame(0, ObrigacaoFinanceira::count(), 'obrigacao_nao_persistida');
         $this->assertSame(0, EventoDominio::count(), 'evento_nao_persistido');
     }
