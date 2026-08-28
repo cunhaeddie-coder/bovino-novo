@@ -170,7 +170,17 @@ class CompraInsumoService
                             'valor_referencia' => 0,
                         ]);
                     } else {
-                        $insumo = Insumo::where('id', $item['insumo_id'])->where('fazenda_id', $fazendaId)->firstOrFail();
+                        // Achado real (Spike 007, extensão, Ataque K, MySQL
+                        // real): sem lockForUpdate(), duas Compras concorrentes
+                        // repondo o mesmo Insumo perdiam incremento (lost
+                        // update) — SELECT sem lock não bloqueia, cada
+                        // transação computava a soma sobre o valor lido no
+                        // início, e a última a commitar sobrescrevia a
+                        // primeira. Refutado 100→150 em vez de 180 antes desta
+                        // correção. lockForUpdate() força a segunda transação
+                        // a esperar a primeira commitar e ler o valor já
+                        // atualizado.
+                        $insumo = Insumo::where('id', $item['insumo_id'])->where('fazenda_id', $fazendaId)->lockForUpdate()->firstOrFail();
                     }
 
                     // SCHEMA-CONTRATO-COMPRA-INSUMO.md §5 — núcleo obrigatório:
