@@ -224,7 +224,24 @@ class CompraInsumoService
             });
         } catch (QueryException $e) {
             if ($this->violacaoDeUnicidade($e)) {
-                return ['reenvio_detectado' => true, 'compra' => CompraInsumo::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
+                $existente = CompraInsumo::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->first();
+                if ($existente) {
+                    return ['reenvio_detectado' => true, 'compra' => $existente];
+                }
+
+                // Achado real (Spike 007, extensão 3, Ataque L, MySQL real):
+                // SQLSTATE 23000 sem CompraInsumo correspondente não é
+                // colisão de chave_idempotencia — é outra violação de
+                // UNIQUE (ex: dois processos declarando insumo_novo com o
+                // mesmo nome ao mesmo tempo). O pre-check sequencial não
+                // evita isso: é uma corrida TOCTOU genuína entre o SELECT
+                // do pre-check e o INSERT dentro da transação, só visível
+                // sob concorrência real. Sem este catch, `firstOrFail()`
+                // vazava ModelNotFoundException — corrigido pra um erro
+                // claro que diz o que aconteceu.
+                throw new DomainException(
+                    'Não foi possível concluir a Compra de Insumo — um dos itens colidiu com outra operação concorrente (nome de Insumo já criado por outra Compra ao mesmo tempo). Tente novamente referenciando o Insumo por insumo_id.'
+                );
             }
             throw $e;
         }
