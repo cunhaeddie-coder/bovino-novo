@@ -4,6 +4,7 @@ namespace Tests\Feature\VerticalFormaPagamento;
 
 use App\Models\Animal;
 use App\Models\Compra;
+use App\Models\EventoDominio;
 use App\Models\Fazenda;
 use App\Models\FormaPagamento;
 use App\Models\FormaPagamentoHistorico;
@@ -70,6 +71,11 @@ class FormaPagamentoDominioTest extends TestCase
         $this->assertNotNull($resultado['forma_pagamento']->pago_em);
         $this->assertEqualsWithDelta(500.00, (float) $resultado['forma_pagamento']->valor_liquidado_reais, 0.01);
         $this->assertSame('pago', $obrigacao->fresh()->status);
+
+        // VERTICAL-FORMA-PAGAMENTO.md §4 — outbox real, mesmo mecanismo genérico.
+        $evento = EventoDominio::where('fazenda_id', $this->fazenda)->where('tipo', 'forma_pagamento_liquidada')->first();
+        $this->assertNotNull($evento, 'liquidar_dispara_evento_de_outbox');
+        $this->assertSame($forma->id, $evento->payload['forma_pagamento_id']);
     }
 
     public function test_liquidar_em_arroba_converte_pela_cotacao_da_liquidacao_nunca_antes(): void

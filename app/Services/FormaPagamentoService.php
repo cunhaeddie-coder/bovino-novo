@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Animal;
+use App\Models\EventoDominio;
 use App\Models\FormaPagamento;
 use App\Models\FormaPagamentoHistorico;
 use App\Models\Usuario;
@@ -70,6 +71,17 @@ class FormaPagamentoService
             }
 
             $forma->update($dados);
+
+            // VERTICAL-FORMA-PAGAMENTO.md §4 — evento novo (mesmo mecanismo
+            // genérico de outbox já usado pelos 3 Services), dentro da mesma
+            // transação da liquidação. Chave de idempotência do EVENTO
+            // escopada por FormaPagamento (nunca duplica mesmo se liquidar()
+            // for chamado de novo depois — mas isso já não deveria acontecer,
+            // o guard de pago_em acima intercepta antes).
+            $this->registrarEvento('forma_pagamento_liquidada', $fazendaId, "forma-pagamento-{$forma->id}", [
+                'tipo' => 'forma_pagamento_liquidada', 'forma_pagamento_id' => $forma->id,
+                'obrigacao_financeira_id' => $forma->obrigacao_financeira_id, 'fazenda_id' => $fazendaId,
+            ]);
 
             return ['ja_liquidada' => false, 'forma_pagamento' => $forma->fresh()];
         });
@@ -159,5 +171,17 @@ class FormaPagamentoService
         if (! $usuario->temRelacaoComFazenda($fazendaId)) {
             throw new DomainException("Operação recusada: usuário {$usuarioId} sem relação com a Fazenda {$fazendaId}.");
         }
+    }
+
+    // Mesmo padrão duplicado nos 3 Services existentes (registrarEvento()).
+    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
+    {
+        return EventoDominio::create([
+            'tipo' => $tipo,
+            'fazenda_id' => $fazendaId,
+            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
+            'payload' => $payload,
+            'status_consequencia' => 'pendente',
+        ]);
     }
 }
