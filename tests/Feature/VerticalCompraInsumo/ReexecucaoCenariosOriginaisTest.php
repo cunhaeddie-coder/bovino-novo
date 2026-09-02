@@ -10,7 +10,6 @@ use App\Models\Papel;
 use App\Models\Usuario;
 use App\Services\CompraInsumoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -18,15 +17,13 @@ use Tests\TestCase;
  * Compra de Insumo além de LAB-SA-003 (CicloIntegradoTest) e LAB-FA-015
  * (mesmo teste, conceito provado com outros números).
  *
- * Achado de fronteira encontrado ao escrever este teste, não escondido:
- * `obrigacoes_financeiras` não tem coluna de vencimento — `status` é sempre
- * 'pago', fixado por CompraInsumoService::registrar(), qualquer que seja o
- * prazo real combinado. Isso significa que a dimensão "à vista vs. a prazo"
- * de LAB-SA-005/LAB-FA-008 (ambos "a prazo 30 dias") não é representável
- * hoje — nem por decisão de domínio (parcelamento, essa sim decidida fora do
- * corte mínimo), só porque a coluna nunca existiu. Os testes abaixo verificam
- * só o que o vertical realmente promete (uma única obrigação financeira
- * correta, vinculando todos os itens) e não afirmam nada sobre prazo.
+ * Gap fechado (02/09/2026, Vertical Forma de Pagamento): o achado de
+ * fronteira original — `obrigacoes_financeiras` sem coluna de vencimento,
+ * "à vista vs. a prazo" de LAB-SA-005/LAB-FA-008 não representável — deixou
+ * de existir. `vencimento` agora vive em `formas_pagamento` (INV-033,
+ * obrigatório sem exceção), e toda Compra de Insumo já nasce com uma
+ * FormaPagamento "à vista" real. O teste que documentava o gap como aceito
+ * virou o teste que confirma o oposto, abaixo.
  */
 class ReexecucaoCenariosOriginaisTest extends TestCase
 {
@@ -106,12 +103,26 @@ class ReexecucaoCenariosOriginaisTest extends TestCase
         $this->assertSame(1, ObrigacaoFinanceira::where('compra_insumo_id', $resultado['compra']->id)->count(), 'uma_unica_divida_tambem_em_escala');
     }
 
-    /** Achado de fronteira registrado, não escondido — ver docblock da classe. */
-    public function test_ainda_nao_existe_coluna_de_vencimento_a_prazo_nao_e_representavel(): void
+    /** Gap fechado (02/09/2026) — ver docblock da classe. */
+    public function test_vencimento_agora_existe_e_e_representado_pela_forma_de_pagamento_a_vista(): void
     {
-        $this->assertFalse(
-            Schema::hasColumn('obrigacoes_financeiras', 'vencimento'),
-            'confirma_o_gap_a_prazo_nao_modelado_nao_e_regressao_deste_vertical_e_sim_escopo_nunca_prometido'
+        $fazenda = Fazenda::create(['nome' => 'Sítio Alegria'])->id;
+        $jose = Usuario::create(['nome' => 'José'])->id;
+        Papel::create(['usuario_id' => $jose, 'fazenda_id' => $fazenda, 'papel' => 'dono']);
+        $marilia = Fornecedor::create(['nome' => 'Marília'])->id;
+
+        $compras = app(CompraInsumoService::class);
+        $resultado = $compras->registrar(
+            $jose, $fazenda, $marilia,
+            [['insumo_novo' => ['nome' => 'Sal Branco 25kg'], 'quantidade' => 4, 'valor_unitario' => 45.00]],
+            '2026-02-01', 'reexecucao-vencimento'
         );
+
+        $obrigacao = ObrigacaoFinanceira::where('compra_insumo_id', $resultado['compra']->id)->firstOrFail();
+        $forma = $obrigacao->formasPagamento()->firstOrFail();
+
+        $this->assertNotNull($forma->vencimento, 'vencimento_sempre_presente_mesmo_a_vista');
+        $this->assertNotNull($forma->pago_em, 'a_vista_ja_nasce_liquidada');
+        $this->assertSame('pago', $obrigacao->status, 'status_computado_reflete_a_liquidacao_real');
     }
 }

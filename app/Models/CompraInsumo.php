@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 class CompraInsumo extends Model
@@ -54,6 +55,11 @@ class CompraInsumo extends Model
     public function itens(): HasMany
     {
         return $this->hasMany(CompraInsumoItem::class);
+    }
+
+    public function obrigacaoFinanceira(): HasOne
+    {
+        return $this->hasOne(ObrigacaoFinanceira::class);
     }
 
     public function newEloquentBuilder($query): Builder

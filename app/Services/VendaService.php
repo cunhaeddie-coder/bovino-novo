@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Animal;
 use App\Models\EventoDominio;
+use App\Models\FormaPagamento;
 use App\Models\Lote;
+use App\Models\ObrigacaoFinanceira;
 use App\Models\ResponsavelFiscal;
 use App\Models\Usuario;
 use App\Models\Venda;
@@ -129,6 +131,22 @@ class VendaService
                     'receita_liquida' => $receitaLiquida,
                 ]);
 
+                // SCHEMA-CONTRATO-FORMA-PAGAMENTO.md §3, Opção A — Venda
+                // nunca gerou nenhuma Obrigação Financeira antes desta
+                // frente (assimetria real com Compra, achada só agora).
+                // direcao=a_receber (é a Fazenda quem vai receber); valor é
+                // o BRUTO combinado com o comprador, nunca a receita_liquida
+                // (que já é líquida de CPV/dedução fiscal — dedução interna,
+                // não parte do que o comprador efetivamente paga).
+                $obrigacao = ObrigacaoFinanceira::create([
+                    'fazenda_id' => $fazendaId,
+                    'venda_id' => $venda->id,
+                    'direcao' => 'a_receber',
+                    'valor' => $valorBruto,
+                ]);
+
+                $this->criarFormaPagamentoAVista($obrigacao, $valorBruto, now()->toDateString());
+
                 $this->registrarEvento('venda_concluida', $fazendaId, $chaveIdempotencia, [
                     'tipo' => 'venda_concluida', 'venda_id' => $venda->id, 'fazenda_id' => $fazendaId,
                 ]);
@@ -237,6 +255,19 @@ class VendaService
                     'receita_liquida' => $novaReceitaLiquida,
                 ]);
 
+                // Mesmo padrão de registrar() — a correção é um novo fato
+                // (venda imutável, INV-026), então ganha sua própria
+                // Obrigação Financeira refletindo o valor bruto corrigido,
+                // nunca uma atualização da obrigação da venda original.
+                $novaObrigacao = ObrigacaoFinanceira::create([
+                    'fazenda_id' => $fazendaId,
+                    'venda_id' => $correcao->id,
+                    'direcao' => 'a_receber',
+                    'valor' => $novoValorBruto,
+                ]);
+
+                $this->criarFormaPagamentoAVista($novaObrigacao, $novoValorBruto, now()->toDateString());
+
                 $this->registrarEvento('venda_corrigida', $fazendaId, $chaveIdempotencia, [
                     'tipo' => 'venda_corrigida', 'venda_original_id' => $vendaOriginalId,
                     'correcao_id' => $correcao->id, 'fazenda_id' => $fazendaId,
@@ -281,6 +312,20 @@ class VendaService
         $deducao = $taxa !== null ? round($valorBruto * (float) $taxa, 2) : 0.0;
 
         return [$deducao, $ehPremissa];
+    }
+
+    // VERTICAL-FORMA-PAGAMENTO.md §3 — mesmo padrão de CompraService/CompraInsumoService.
+    private function criarFormaPagamentoAVista(ObrigacaoFinanceira $obrigacao, float $valorTotal, string $data): FormaPagamento
+    {
+        return FormaPagamento::create([
+            'obrigacao_financeira_id' => $obrigacao->id,
+            'nome' => 'à vista',
+            'unidade' => 'dinheiro',
+            'valor' => $valorTotal,
+            'data' => $data,
+            'vencimento' => $data,
+            'pago_em' => $data,
+        ]);
     }
 
     private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio

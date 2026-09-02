@@ -6,6 +6,7 @@ use App\Models\Animal;
 use App\Models\Compra;
 use App\Models\CompraItem;
 use App\Models\EventoDominio;
+use App\Models\FormaPagamento;
 use App\Models\Fornecedor;
 use App\Models\ObrigacaoFinanceira;
 use App\Models\Usuario;
@@ -124,12 +125,21 @@ class CompraService
                     $animaisCriados[] = $animal;
                 }
 
+                // SCHEMA-CONTRATO-FORMA-PAGAMENTO.md §3, Opção A — status não
+                // é mais gravado (INV-032); direcao=a_pagar porque é a
+                // Fazenda quem deve. registrar() ainda não aceita Formas de
+                // Pagamento declaradas (parcelamento fica pra frente
+                // seguinte) — sempre cria uma única "à vista", já liquidada
+                // na data da própria Compra, preservando o comportamento
+                // hoje testado (CompraDominioTest::a8_pago_imediato_a_vista).
                 $obrigacao = ObrigacaoFinanceira::create([
                     'fazenda_id' => $fazendaId,
                     'compra_id' => $compra->id,
+                    'direcao' => 'a_pagar',
                     'valor' => $valorTotal,
-                    'status' => 'pago',
                 ]);
+
+                $this->criarFormaPagamentoAVista($obrigacao, $valorTotal, $dataCompra);
 
                 $this->registrarEvento('compra_concluida', $fazendaId, $chaveIdempotencia, [
                     'tipo' => 'compra_concluida', 'compra_id' => $compra->id, 'fazenda_id' => $fazendaId,
@@ -169,6 +179,23 @@ class CompraService
     private function calcularDeducaoFiscal(int $fazendaId, float $valorTotal): array
     {
         return [0.0, true];
+    }
+
+    // VERTICAL-FORMA-PAGAMENTO.md §3 — a mesma FormaPagamento "à vista" que
+    // os 3 Services criam por padrão até registrar() aceitar parcelamento
+    // declarado. Duplicado nos 3 Services (mesmo padrão de registrarEvento()
+    // já duplicado neste código) — cada Service é independente.
+    private function criarFormaPagamentoAVista(ObrigacaoFinanceira $obrigacao, float $valorTotal, string $data): FormaPagamento
+    {
+        return FormaPagamento::create([
+            'obrigacao_financeira_id' => $obrigacao->id,
+            'nome' => 'à vista',
+            'unidade' => 'dinheiro',
+            'valor' => $valorTotal,
+            'data' => $data,
+            'vencimento' => $data,
+            'pago_em' => $data,
+        ]);
     }
 
     private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio

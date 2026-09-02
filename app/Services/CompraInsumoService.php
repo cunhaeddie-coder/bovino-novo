@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CompraInsumo;
 use App\Models\CompraInsumoItem;
 use App\Models\EventoDominio;
+use App\Models\FormaPagamento;
 use App\Models\Fornecedor;
 use App\Models\Insumo;
 use App\Models\ObrigacaoFinanceira;
@@ -200,13 +201,18 @@ class CompraInsumoService
                     $insumosAfetados[] = $insumo;
                 }
 
+                // SCHEMA-CONTRATO-FORMA-PAGAMENTO.md §3, Opção A — mesma
+                // troca de status='pago' por direcao+FormaPagamento que
+                // CompraService faz (INV-032).
                 $obrigacao = ObrigacaoFinanceira::create([
                     'fazenda_id' => $fazendaId,
                     'compra_id' => null,
                     'compra_insumo_id' => $compra->id,
+                    'direcao' => 'a_pagar',
                     'valor' => $valorTotal,
-                    'status' => 'pago',
                 ]);
+
+                $this->criarFormaPagamentoAVista($obrigacao, $valorTotal, $dataCompra);
 
                 $this->registrarEvento('compra_insumo_concluida', $fazendaId, $chaveIdempotencia, [
                     'tipo' => 'compra_insumo_concluida', 'compra_insumo_id' => $compra->id, 'fazenda_id' => $fazendaId,
@@ -263,6 +269,20 @@ class CompraInsumoService
     private function calcularDeducaoFiscal(int $fazendaId, float $valorTotal): array
     {
         return [0.0, true];
+    }
+
+    // VERTICAL-FORMA-PAGAMENTO.md §3 — mesmo padrão de CompraService/VendaService.
+    private function criarFormaPagamentoAVista(ObrigacaoFinanceira $obrigacao, float $valorTotal, string $data): FormaPagamento
+    {
+        return FormaPagamento::create([
+            'obrigacao_financeira_id' => $obrigacao->id,
+            'nome' => 'à vista',
+            'unidade' => 'dinheiro',
+            'valor' => $valorTotal,
+            'data' => $data,
+            'vencimento' => $data,
+            'pago_em' => $data,
+        ]);
     }
 
     private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio

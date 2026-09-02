@@ -82,10 +82,21 @@ class CicloIntegradoTest extends TestCase
         $this->assertSame(3, CompraItem::where('compra_id', $compra->id)->count(), 'itens_da_compra_continuam_existindo');
         $this->assertSame($fazenda, $animalA->fresh()->fazenda_id, 'animal_continua_apontando_pra_sua_origem');
 
-        // ── 5. Obrigação financeira — continua vinculada só à Compra, Venda não a altera ──
+        // ── 5. Obrigação financeira da Compra continua intocada pela Venda ──
         $obrigacaoDepois = ObrigacaoFinanceira::where('compra_id', $compra->id)->first();
         $this->assertEqualsWithDelta(21500.00, (float) $obrigacaoDepois->valor, 0.01, 'obrigacao_da_compra_nao_alterada_pela_venda');
-        $this->assertSame(1, ObrigacaoFinanceira::where('fazenda_id', $fazenda)->count(), 'venda_nao_cria_obrigacao_financeira_nenhuma');
+
+        // SCHEMA-CONTRATO-FORMA-PAGAMENTO.md §3, Opção A (02/09/2026) —
+        // assimetria corrigida: Venda agora TAMBÉM gera sua própria Obrigação
+        // Financeira (a_receber), independente da Obrigação da Compra
+        // (a_pagar) — updated de 'venda_nao_cria_obrigacao_financeira_nenhuma'
+        // (comportamento antigo, intencionalmente revertido por esta frente).
+        $this->assertSame(2, ObrigacaoFinanceira::where('fazenda_id', $fazenda)->count(), 'compra_e_venda_geram_1_obrigacao_cada');
+        $obrigacaoVenda = ObrigacaoFinanceira::where('venda_id', $resultadoVenda['venda']->id)->first();
+        $this->assertNotNull($obrigacaoVenda, 'venda_agora_gera_obrigacao_financeira');
+        $this->assertSame('a_receber', $obrigacaoVenda->direcao);
+        $this->assertEqualsWithDelta(20000.00, (float) $obrigacaoVenda->valor, 0.01, 'obrigacao_da_venda_e_o_valor_bruto_nao_a_receita_liquida');
+        $this->assertSame('pago', $obrigacaoVenda->status, 'a_vista_ja_nasce_paga');
 
         // ── 6. Eventos — compra_concluida permanece, venda_concluida é produzido, cada um com sua Fazenda ──
         $this->assertNotNull(EventoDominio::find($eventoCompra->id), 'evento_compra_permanece');

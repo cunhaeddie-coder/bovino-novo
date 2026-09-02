@@ -6,6 +6,7 @@ use App\Models\Builders\VendaBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 class Venda extends Model
@@ -43,6 +44,11 @@ class Venda extends Model
     public function original(): BelongsTo
     {
         return $this->belongsTo(Venda::class, 'venda_original_id');
+    }
+
+    public function obrigacaoFinanceira(): HasOne
+    {
+        return $this->hasOne(ObrigacaoFinanceira::class);
     }
 
     public function newEloquentBuilder($query): Builder
