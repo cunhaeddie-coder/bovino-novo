@@ -147,8 +147,9 @@ class NegociacaoService
             ]);
 
             // INV-023 — Anúncio nunca continua ativo depois que o item que
-            // ele anuncia foi vendido.
-            $negociacao->anuncio->update(['status' => 'vendido', 'encerrado_em' => now()->toDateString()]);
+            // ele anuncia foi vendido. GATE-DECISAO-DOMINIO-DATA-HORA.md —
+            // encerrado_em com data e hora reais, não só o dia.
+            $negociacao->anuncio->update(['status' => 'vendido', 'encerrado_em' => now()]);
 
             $this->concluirSeAmbosConfirmaram($negociacao);
 

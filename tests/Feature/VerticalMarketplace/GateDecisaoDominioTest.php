@@ -104,5 +104,11 @@ class GateDecisaoDominioTest extends TestCase
 
         $this->assertSame('vendido', $anuncio->fresh()->status);
         $this->assertNotNull($anuncio->fresh()->encerrado_em);
+
+        // GATE-DECISAO-DOMINIO-DATA-HORA.md (04/09/2026) — extensão
+        // confirmada pelo produtor: publicado_em/encerrado_em também
+        // precisam de data e hora, não só o dia.
+        $this->assertSame('00:00:00', $anuncio->fresh()->publicado_em->format('H:i:s'), 'publicado_em_aceita_hora_quando_declarada_meia_noite_aqui_por_nao_ter_sido_declarada');
+        $this->assertNotSame('00:00:00', $anuncio->fresh()->encerrado_em->format('H:i:s'), 'encerrado_em_grava_a_hora_real_do_encerramento_nunca_so_o_dia');
     }
 }

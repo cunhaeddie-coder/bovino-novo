@@ -13,10 +13,12 @@ class Anuncio extends Model
 
     protected $fillable = ['fazenda_id', 'preco_total', 'status', 'publicado_em', 'encerrado_em'];
 
+    // GATE-DECISAO-DOMINIO-DATA-HORA.md (04/09/2026) — extensão confirmada
+    // pelo produtor: publicado_em/encerrado_em também precisam de data e hora.
     protected $casts = [
         'preco_total' => 'decimal:2',
-        'publicado_em' => 'date',
-        'encerrado_em' => 'date',
+        'publicado_em' => 'datetime',
+        'encerrado_em' => 'datetime',
     ];
 
     public function fazenda(): BelongsTo
