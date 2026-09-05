@@ -99,7 +99,7 @@ class GateDecisaoDominioTest extends TestCase
         $animal = Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => $lote, 'status' => 'ativo'])->id;
 
         $this->assertThrows(
-            fn () => $this->vendas->registrar($this->jose, $this->fazenda, [$animal], 1000.00, ''),
+            fn () => $this->vendas->registrar($this->jose, $this->fazenda, [$animal], 1000.00, '2026-01-01 10:00:00', ''),
             DomainException::class
         );
 
@@ -113,7 +113,7 @@ class GateDecisaoDominioTest extends TestCase
         $a1 = Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => $lote, 'status' => 'ativo'])->id;
         $a2 = Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => $lote, 'status' => 'ativo'])->id;
 
-        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$a1, $a2], 1000.00, 'venda-original');
+        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$a1, $a2], 1000.00, '2026-01-01 10:00:00', 'venda-original');
 
         $this->assertThrows(
             fn () => $this->vendas->corrigir($this->jose, $venda['venda']->id, [$a1, $a2], 1200.00, ''),

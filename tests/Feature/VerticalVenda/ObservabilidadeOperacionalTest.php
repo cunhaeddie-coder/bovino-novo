@@ -46,7 +46,7 @@ class ObservabilidadeOperacionalTest extends TestCase
         [$fazenda, $usuario, $animal] = $this->semearMundoMinimo();
 
         // Cria trabalho pendente real — uma Venda de verdade, evento outbox real.
-        app(VendaService::class)->registrar($usuario, $fazenda, [$animal], 500.00, 'obs-ataque-1');
+        app(VendaService::class)->registrar($usuario, $fazenda, [$animal], 500.00, '2026-01-01 10:00:00', 'obs-ataque-1');
 
         // Tempo real passa. Sleep curto mas real — nada de Carbon::setTestNow().
         sleep(2);
@@ -66,7 +66,7 @@ class ObservabilidadeOperacionalTest extends TestCase
     {
         Artisan::call('eventos:processar');
         [$fazenda, $usuario, $animal] = $this->semearMundoMinimo();
-        app(VendaService::class)->registrar($usuario, $fazenda, [$animal], 500.00, 'obs-recuperacao-1');
+        app(VendaService::class)->registrar($usuario, $fazenda, [$animal], 500.00, '2026-01-01 10:00:00', 'obs-recuperacao-1');
         sleep(2);
 
         // Confirma que o "ataque" realmente deixou rastro antes de religar.

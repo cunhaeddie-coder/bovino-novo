@@ -63,7 +63,7 @@ class CicloIntegradoTest extends TestCase
         $this->assertNotNull($eventoCompra, 'evento_compra_completo');
 
         // ── 2. Venda posterior de apenas alguns animais (A e C, não B) ──
-        $resultadoVenda = $vendas->registrar($jose, $fazenda, [$animalA->id, $animalC->id], 20000.00, 'venda-a-e-c');
+        $resultadoVenda = $vendas->registrar($jose, $fazenda, [$animalA->id, $animalC->id], 20000.00, '2026-01-01 10:00:00', 'venda-a-e-c');
 
         $this->assertFalse($resultadoVenda['reenvio_detectado']);
 

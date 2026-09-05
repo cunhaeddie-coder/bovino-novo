@@ -53,7 +53,7 @@ class VendaDeAnimalSemLoteTest extends TestCase
         $this->assertNull($touro->fresh()->lote_id);
 
         // Um ano depois, José vende o touro por R$22.000,00.
-        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$touro->id], 22000.00, 'venda-touro-2027');
+        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$touro->id], 22000.00, '2027-02-26 10:00:00', 'venda-touro-2027');
 
         $this->assertEqualsWithDelta(15000.00, $venda['cpv'], 0.01, 'cpv_e_o_custo_de_aquisicao_direto_do_animal_nunca_dividido_de_lote_inexistente');
         $this->assertEqualsWithDelta(22000.00 - 15000.00, $venda['receita_liquida'], 0.01, 'receita_liquida_correta_sem_fallback_para_zero_ou_valor_inventado');
@@ -70,7 +70,7 @@ class VendaDeAnimalSemLoteTest extends TestCase
         $compra = $this->compras->registrar($this->jose, $this->fazenda, $this->marilia, [3000.00], '2026-02-26', 'compra-individual');
         $animalSemLote = $compra['animais'][0];
 
-        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$animalComLote->id, $animalSemLote->id], 10000.00, 'venda-mista');
+        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$animalComLote->id, $animalSemLote->id], 10000.00, '2026-02-26 10:00:00', 'venda-mista');
 
         // CPV esperado: 1000.00 (metade do lote de 2000/2 animais) + 3000.00 (direto do animal sem lote).
         $this->assertEqualsWithDelta(4000.00, $venda['cpv'], 0.01, 'cpv_soma_os_dois_caminhos_corretamente');

@@ -12,12 +12,13 @@ use LogicException;
 class Venda extends Model
 {
     protected $fillable = [
-        'fazenda_id', 'venda_original_id', 'chave_idempotencia', 'animal_ids',
+        'fazenda_id', 'venda_original_id', 'chave_idempotencia', 'animal_ids', 'data_venda',
         'valor_bruto', 'cpv', 'deducao_fiscal', 'fiscal_e_premissa', 'receita_liquida',
     ];
 
     protected $casts = [
         'animal_ids' => 'array',
+        'data_venda' => 'datetime',
         'valor_bruto' => 'decimal:2',
         'cpv' => 'decimal:2',
         'deducao_fiscal' => 'decimal:2',
@@ -33,6 +34,16 @@ class Venda extends Model
             throw new LogicException(
                 'Venda é imutável depois de criada (INV-026) — correção deve criar uma nova linha, nunca alterar esta.'
             );
+        });
+
+        // GATE-DECISAO-DOMINIO-DATA-HORA.md — decisão direta do produtor
+        // (04/09/2026): venda precisa constar com data e hora, sem exceção —
+        // mesma disciplina de INV-033 (vencimento de Forma de Pagamento).
+        // Nullable no schema (Princípio 4b), obrigatório por guard.
+        static::creating(function (self $venda) {
+            if ($venda->data_venda === null) {
+                throw new LogicException('Venda precisa de data_venda preenchida (data e hora reais do fato) — nunca nula.');
+            }
         });
     }
 

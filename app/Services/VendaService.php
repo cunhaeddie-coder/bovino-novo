@@ -41,7 +41,11 @@ class VendaService
         return $venda;
     }
 
-    public function registrar(int $usuarioId, int $fazendaId, array $animalIds, float $valorBruto, string $chaveIdempotencia): array
+    // GATE-DECISAO-DOMINIO-DATA-HORA.md (04/09/2026) — $dataVenda é a data e
+    // hora REAIS do fato (declarada pelo chamador, nunca inferida de now()
+    // sozinho), distinta de created_at (prova de sistema). Formato
+    // 'Y-m-d H:i:s' — mesma disciplina de $dataCompra em CompraService.
+    public function registrar(int $usuarioId, int $fazendaId, array $animalIds, float $valorBruto, string $dataVenda, string $chaveIdempotencia): array
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
@@ -60,7 +64,7 @@ class VendaService
         }
 
         try {
-            return DB::transaction(function () use ($fazendaId, $animalIds, $valorBruto, $chaveIdempotencia) {
+            return DB::transaction(function () use ($fazendaId, $animalIds, $valorBruto, $dataVenda, $chaveIdempotencia) {
                 $animais = Animal::where('fazenda_id', $fazendaId)
                     ->whereIn('id', $animalIds)
                     ->where('status', 'ativo')
@@ -124,6 +128,7 @@ class VendaService
                     'venda_original_id' => null,
                     'chave_idempotencia' => $chaveIdempotencia,
                     'animal_ids' => $idsVendidos,
+                    'data_venda' => $dataVenda,
                     'valor_bruto' => $valorBruto,
                     'cpv' => $cpv,
                     'deducao_fiscal' => $deducaoFiscal,
@@ -243,11 +248,16 @@ class VendaService
                 $novoCpv = round($custoUnitarioOriginal * count($novosAnimalIds), 2);
                 $novaReceitaLiquida = round($novoValorBruto - $novoCpv - $deducaoFiscal, 2);
 
+                // GATE-DECISAO-DOMINIO-DATA-HORA.md — a correção é seu
+                // próprio fato novo (INV-026), sua data_venda é o momento
+                // real em que a correção acontece, nunca herdada da venda
+                // original (que já tem a sua própria).
                 $correcao = Venda::create([
                     'fazenda_id' => $fazendaId,
                     'venda_original_id' => $vendaOriginalId,
                     'chave_idempotencia' => $chaveIdempotencia,
                     'animal_ids' => $novosAnimalIds,
+                    'data_venda' => now(),
                     'valor_bruto' => $novoValorBruto,
                     'cpv' => $novoCpv,
                     'deducao_fiscal' => $deducaoFiscal,

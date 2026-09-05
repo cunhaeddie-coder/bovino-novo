@@ -84,7 +84,7 @@ class Spike006ReexecucaoTest extends TestCase
         $idsFazendaA = Animal::where('fazenda_id', $this->fazendaA)->orderBy('id')->limit(28)->pluck('id')->all();
         $idsFazendaB = Animal::where('fazenda_id', $this->fazendaB)->pluck('id')->all();
 
-        $venda = $this->vendas->registrar($this->jose, $this->fazendaA, $idsFazendaA, 99999.76, 'venda-jose-28vacas-2026-01-15');
+        $venda = $this->vendas->registrar($this->jose, $this->fazendaA, $idsFazendaA, 99999.76, '2026-01-15 10:00:00', 'venda-jose-28vacas-2026-01-15');
 
         // a1/a2
         $vendaLida = $this->vendas->buscar($this->jose, $venda['venda']->id);
@@ -140,13 +140,13 @@ class Spike006ReexecucaoTest extends TestCase
         $this->assertNull($this->vendas->buscar($this->mariazinha, $venda['venda']->id), 'a13_mariazinha_nao_le_venda_de_jose');
 
         // a14
-        $this->assertThrows(fn () => $this->vendas->registrar($this->mariazinha, $this->fazendaA, [$idsFazendaA[0]], 500.00, 'ataque-mariazinha-vende-fazenda-a'), DomainException::class);
+        $this->assertThrows(fn () => $this->vendas->registrar($this->mariazinha, $this->fazendaA, [$idsFazendaA[0]], 500.00, '2026-01-15 10:00:00', 'ataque-mariazinha-vende-fazenda-a'), DomainException::class);
 
         // a15
-        $this->assertThrows(fn () => $this->vendas->registrar($this->jose, $this->fazendaB, [$idsFazendaB[0]], 500.00, 'ataque-jose-vende-fazenda-b'), DomainException::class);
+        $this->assertThrows(fn () => $this->vendas->registrar($this->jose, $this->fazendaB, [$idsFazendaB[0]], 500.00, '2026-01-15 10:00:00', 'ataque-jose-vende-fazenda-b'), DomainException::class);
 
         // a16 — José tem relação com a Fazenda A, mas tenta misturar animal da Fazenda B numa venda da A.
-        $this->assertThrows(fn () => $this->vendas->registrar($this->jose, $this->fazendaA, [$idsFazendaB[1]], 500.00, 'ataque-jose-mistura-animal-da-b'), DomainException::class);
+        $this->assertThrows(fn () => $this->vendas->registrar($this->jose, $this->fazendaA, [$idsFazendaB[1]], 500.00, '2026-01-15 10:00:00', 'ataque-jose-mistura-animal-da-b'), DomainException::class);
 
         return ['venda' => $venda, 'idsFazendaA' => $idsFazendaA];
     }
@@ -206,8 +206,8 @@ class Spike006ReexecucaoTest extends TestCase
         $idsFazendaA = Animal::where('fazenda_id', $this->fazendaA)->orderBy('id')->limit(5)->pluck('id')->all();
         $idsFazendaB = Animal::where('fazenda_id', $this->fazendaB)->orderBy('id')->limit(3)->pluck('id')->all();
 
-        $this->vendas->registrar($this->jose, $this->fazendaA, $idsFazendaA, 10000.00, 'venda-a-consumidor');
-        $this->vendas->registrar($this->mariazinha, $this->fazendaB, $idsFazendaB, 5000.00, 'venda-b-consumidor');
+        $this->vendas->registrar($this->jose, $this->fazendaA, $idsFazendaA, 10000.00, '2026-01-15 10:00:00', 'venda-a-consumidor');
+        $this->vendas->registrar($this->mariazinha, $this->fazendaB, $idsFazendaB, 5000.00, '2026-01-15 10:00:00', 'venda-b-consumidor');
 
         $eventoA = EventoDominio::where('fazenda_id', $this->fazendaA)->firstOrFail();
         $eventoB = EventoDominio::where('fazenda_id', $this->fazendaB)->firstOrFail();

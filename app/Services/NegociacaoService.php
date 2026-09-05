@@ -128,11 +128,16 @@ class NegociacaoService
             // Fazenda e não foram vendidos por nenhum canal — herda de graça
             // a defesa contra uma 2ª Negociação concorrente vendendo os
             // mesmos animais (SCHEMA-CONTRATO-MARKETPLACE.md §5).
+            // GATE-DECISAO-DOMINIO-DATA-HORA.md — o momento da confirmação
+            // do vendedor É o momento real do fato Venda neste canal (não há
+            // uma data "combinada" separada da confirmação, diferente do
+            // registro direto de Venda fora do Marketplace).
             $resultadoVenda = app(VendaService::class)->registrar(
                 $usuarioId,
                 $fazendaVendedoraId,
                 $animalIds,
                 (float) $negociacao->preco_proposto,
+                now()->format('Y-m-d H:i:s'),
                 $negociacao->chave_idempotencia.':venda'
             );
 
@@ -178,12 +183,15 @@ class NegociacaoService
                 $negociacao->anuncio->animais->count()
             );
 
+            // GATE-DECISAO-DOMINIO-DATA-HORA.md — mesmo raciocínio do lado
+            // vendedor: o momento da confirmação do comprador É o momento
+            // real do fato Compra neste canal.
             $resultadoCompra = app(CompraService::class)->registrar(
                 $usuarioId,
                 $negociacao->fazenda_compradora_id,
                 $fornecedor->id,
                 $valoresPorAnimal,
-                now()->toDateString(),
+                now()->format('Y-m-d H:i:s'),
                 $negociacao->chave_idempotencia.':compra'
             );
 

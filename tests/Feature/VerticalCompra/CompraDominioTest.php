@@ -106,4 +106,12 @@ class CompraDominioTest extends TestCase
             DomainException::class
         );
     }
+
+    /** GATE-DECISAO-DOMINIO-DATA-HORA.md (04/09/2026) — data_compra precisa preservar hora, não só dia. */
+    public function test_data_compra_preserva_hora_real_declarada(): void
+    {
+        $resultado = $this->compras->registrar($this->jose, $this->fazenda, $this->marilia, [1000.00], '2026-05-10 16:45:00', 'compra-com-hora');
+
+        $this->assertSame('2026-05-10 16:45:00', $resultado['compra']->fresh()->data_compra->format('Y-m-d H:i:s'), 'hora_real_declarada_preservada_exata');
+    }
 }

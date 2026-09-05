@@ -42,7 +42,7 @@ class CicloIntegradoTest extends TestCase
         // ── 2. Venda (automática, via VendaService) — também à vista por padrão ──
         $venda = Venda::create([
             'fazenda_id' => $fazenda, 'chave_idempotencia' => 'venda-base',
-            'animal_ids' => [], 'valor_bruto' => 20000.00, 'cpv' => 0, 'deducao_fiscal' => 0,
+            'animal_ids' => [], 'data_venda' => '2026-01-01 10:00:00', 'valor_bruto' => 20000.00, 'cpv' => 0, 'deducao_fiscal' => 0,
             'fiscal_e_premissa' => true, 'receita_liquida' => 20000.00,
         ]);
         // Simula uma Venda "com entrada + parcela" — declaração direta de

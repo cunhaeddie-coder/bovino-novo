@@ -37,7 +37,7 @@ class SchemaEstruturalTest extends TestCase
     {
         return Venda::create([
             'fazenda_id' => $fazendaId, 'chave_idempotencia' => 'venda-'.uniqid(),
-            'animal_ids' => [], 'valor_bruto' => 100, 'cpv' => 0, 'deducao_fiscal' => 0,
+            'animal_ids' => [], 'data_venda' => '2026-01-01 10:00:00', 'valor_bruto' => 100, 'cpv' => 0, 'deducao_fiscal' => 0,
             'fiscal_e_premissa' => true, 'receita_liquida' => 100,
         ]);
     }

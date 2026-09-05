@@ -59,10 +59,10 @@ class RevisaoAdversarialTest extends TestCase
         $b1 = Animal::create(['fazenda_id' => $fazendaB, 'lote_id' => $loteB, 'status' => 'ativo'])->id;
         $b2 = Animal::create(['fazenda_id' => $fazendaB, 'lote_id' => $loteB, 'status' => 'ativo'])->id;
 
-        $vendaJose = $this->vendas->registrar($jose, $fazendaA, [$a1, $a2], 999.99, 'venda-001');
+        $vendaJose = $this->vendas->registrar($jose, $fazendaA, [$a1, $a2], 999.99, '2026-01-01 10:00:00', 'venda-001');
 
         // Mariazinha, sem nenhuma relação com José, usa por coincidência a mesma chave.
-        $resultado = $this->vendas->registrar($mariazinha, $fazendaB, [$b1, $b2], 5000.00, 'venda-001');
+        $resultado = $this->vendas->registrar($mariazinha, $fazendaB, [$b1, $b2], 5000.00, '2026-01-01 10:00:00', 'venda-001');
 
         $this->assertFalse($resultado['reenvio_detectado'], 'chaves coincidentes em Fazendas diferentes são operações distintas, não reenvio');
         $this->assertNotSame($vendaJose['venda']->id, $resultado['venda']->id, 'Mariazinha nunca pode receber a Venda de José de volta');
@@ -92,7 +92,7 @@ class RevisaoAdversarialTest extends TestCase
         $loteB = Lote::create(['fazenda_id' => $fazendaB, 'qtd_animais' => 1, 'custo_aquisicao' => 1000])->id;
         $animalDeOutraFazenda = Animal::create(['fazenda_id' => $fazendaB, 'lote_id' => $loteB, 'status' => 'ativo'])->id;
 
-        $venda = $this->vendas->registrar($jose, $fazendaA, [$a1, $a2, $a3], 300.00, 'venda-1');
+        $venda = $this->vendas->registrar($jose, $fazendaA, [$a1, $a2, $a3], 300.00, '2026-01-01 10:00:00', 'venda-1');
 
         $this->assertThrows(
             fn () => $this->vendas->corrigir($jose, $venda['venda']->id, [$a1, $a2, $animalDeOutraFazenda], 300.00, 'correcao-1'),
@@ -120,7 +120,7 @@ class RevisaoAdversarialTest extends TestCase
         $fazenda = Fazenda::create(['nome' => 'A'])->id;
         $venda = Venda::create([
             'fazenda_id' => $fazenda, 'venda_original_id' => null, 'chave_idempotencia' => 'k1',
-            'animal_ids' => [1, 2, 3], 'valor_bruto' => 100, 'cpv' => 10, 'deducao_fiscal' => 0,
+            'animal_ids' => [1, 2, 3], 'data_venda' => '2026-01-01 10:00:00', 'valor_bruto' => 100, 'cpv' => 10, 'deducao_fiscal' => 0,
             'fiscal_e_premissa' => true, 'receita_liquida' => 90,
         ]);
 
@@ -153,7 +153,7 @@ class RevisaoAdversarialTest extends TestCase
         [$a1, $a2, $a3, $a4, $a5] = $animais;
 
         $vendas = app(VendaService::class);
-        $venda = $vendas->registrar($usuario, $fazenda, $animais, 500.00, 'venda-original');
+        $venda = $vendas->registrar($usuario, $fazenda, $animais, 500.00, '2026-01-01 10:00:00', 'venda-original');
 
         // Duas correções SEQUENCIAIS (nem precisa de corrida real pra provar
         // a lógica) pedindo a MESMA remoção — a5 sai nas duas.

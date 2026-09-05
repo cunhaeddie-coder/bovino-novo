@@ -60,6 +60,14 @@ class GateDecisaoDominioTest extends TestCase
         $this->assertNotNull($obrigacaoCompra, 'compra_do_marketplace_gera_obrigacao_financeira_real');
         $this->assertSame('a_pagar', $obrigacaoCompra->direcao);
 
+        // GATE-DECISAO-DOMINIO-DATA-HORA.md (04/09/2026) — venda, confirmação
+        // da venda, compra e confirmação da compra precisam constar com data
+        // e hora, sem exceção, também no canal Marketplace.
+        $this->assertNotNull($venda->data_venda, 'venda_do_marketplace_tem_data_e_hora');
+        $this->assertNotNull($compra->data_compra, 'compra_do_marketplace_tem_data_e_hora');
+        $this->assertNotNull($negociacao->fresh()->confirmado_vendedor_em, 'confirmacao_da_venda_tem_data_e_hora');
+        $this->assertNotNull($negociacao->fresh()->confirmado_comprador_em, 'confirmacao_da_compra_tem_data_e_hora');
+
         // O animal original fica marcado vendido na Fazenda vendedora — a
         // Compra cria um Animal NOVO na Fazenda compradora (mesmo mecanismo
         // que CompraService já usa pra qualquer Compra normal), nunca

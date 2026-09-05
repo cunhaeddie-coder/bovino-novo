@@ -20,7 +20,7 @@ class CompraInsumo extends Model
     ];
 
     protected $casts = [
-        'data_compra' => 'date',
+        'data_compra' => 'datetime',
         'valor_total' => 'decimal:2',
         'deducao_fiscal' => 'decimal:2',
         'fiscal_e_premissa' => 'boolean',

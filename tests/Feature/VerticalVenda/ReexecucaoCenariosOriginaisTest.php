@@ -54,7 +54,7 @@ class ReexecucaoCenariosOriginaisTest extends TestCase
         $compra = $compras->registrar($this->jose, $this->fazenda, $fornecedor, [12500.00], '2025-01-01', 'lab-fa-004-compra');
         $touro = $compra['animais'][0];
 
-        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$touro->id], 7000.00, 'lab-fa-004-venda');
+        $venda = $this->vendas->registrar($this->jose, $this->fazenda, [$touro->id], 7000.00, '2025-01-02 09:00:00', 'lab-fa-004-venda');
 
         $this->assertEqualsWithDelta(12500.00, $venda['cpv'], 0.01, 'cpv_e_o_custo_de_aquisicao_real_nunca_ignorado');
         $this->assertEqualsWithDelta(7000.00 - 12500.00, $venda['receita_liquida'], 0.01, 'receita_liquida_negativa_prejuizo_reconhecido_nao_lucro_de_7000');
@@ -82,7 +82,7 @@ class ReexecucaoCenariosOriginaisTest extends TestCase
             fn () => Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => null, 'custo_aquisicao' => 0, 'status' => 'ativo'])
         );
 
-        $venda = $this->vendas->registrar($this->jose, $this->fazenda, $bezerros->pluck('id')->all(), 112000.00, 'lab-fa-014-venda-direta');
+        $venda = $this->vendas->registrar($this->jose, $this->fazenda, $bezerros->pluck('id')->all(), 112000.00, '2025-02-01 09:00:00', 'lab-fa-014-venda-direta');
 
         $this->assertFalse($venda['reenvio_detectado']);
         $this->assertEqualsWithDelta(0.0, $venda['cpv'], 0.01, 'nascidos_na_fazenda_sem_valor_capitalizado_cpv_zero');
