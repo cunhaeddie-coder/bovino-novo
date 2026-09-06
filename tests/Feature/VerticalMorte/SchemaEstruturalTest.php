@@ -19,6 +19,11 @@ class SchemaEstruturalTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_teste_negativo_deliberadamente_quebrado_para_provar_branch_protection(): void
+    {
+        $this->assertTrue(false, 'Quebra proposital — prova real de que o merge é bloqueado (spike de branch protection).');
+    }
+
     public function test_morte_e_imutavel_depois_de_registrada(): void
     {
         $fazenda = Fazenda::create(['nome' => 'A']);
