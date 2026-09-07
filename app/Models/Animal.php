@@ -11,11 +11,12 @@ class Animal extends Model
 {
     protected $table = 'animais';
 
-    protected $fillable = ['fazenda_id', 'lote_id', 'custo_aquisicao', 'status', 'data_saida'];
+    protected $fillable = ['fazenda_id', 'lote_id', 'custo_aquisicao', 'status', 'data_saida', 'tipo_origem', 'mae_id', 'peso_nascimento'];
 
     protected $casts = [
         'data_saida' => 'date',
         'custo_aquisicao' => 'decimal:2',
+        'peso_nascimento' => 'decimal:2',
     ];
 
     // SCHEMA-CONTRATO-COMPRA.md §5 — lote_id e custo_aquisicao são
@@ -49,6 +50,11 @@ class Animal extends Model
     public function lote(): BelongsTo
     {
         return $this->belongsTo(Lote::class);
+    }
+
+    public function mae(): BelongsTo
+    {
+        return $this->belongsTo(Animal::class, 'mae_id');
     }
 
     public function itensDeCompra(): HasMany
