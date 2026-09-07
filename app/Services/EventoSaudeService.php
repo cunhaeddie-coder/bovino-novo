@@ -8,7 +8,6 @@ use App\Models\EventoSaude;
 use App\Models\Usuario;
 use DomainException;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 
 /**
  * O núcleo do Vertical 11 (Evento de Saúde — a ponte, pra Consumo de
@@ -18,6 +17,17 @@ use Illuminate\Support\Facades\DB;
  * lógica de consumo nova aqui. Diferente de Morte (ponte de algoritmo),
  * chamar o Service real é exatamente o comportamento certo: a baixa de
  * estoque de um Evento de Saúde é idêntica à de qualquer outro consumo.
+ *
+ * Achado real do Spike 007 (Ataque CC), corrigido antes do produto ir pra
+ * frente: NÃO envolver a chamada a ConsumoInsumoService::registrar() num
+ * DB::transaction() próprio aqui. Laravel aninha transações como SAVEPOINT
+ * da mesma transação externa — sob REPEATABLE READ (padrão do MySQL), a
+ * consulta de "achei o vencedor da corrida" que ConsumoInsumoService faz no
+ * seu próprio catch de QueryException passa a rodar dentro do snapshot da
+ * transação externa (mais antigo que o commit do processo concorrente),
+ * podendo não enxergar a linha já commitada por ele — ModelNotFoundException
+ * em vez de reenvio_detectado=true. ConsumoInsumoService precisa rodar como
+ * transação própria de verdade (topo), não como savepoint de outra.
  */
 class EventoSaudeService
 {
@@ -61,38 +71,37 @@ class EventoSaudeService
             throw new DomainException('Um ou mais animais informados não pertencem a esta Fazenda.');
         }
 
-        return DB::transaction(function () use ($usuarioId, $fazendaId, $animalIds, $insumoId, $quantidade, $descricao, $dataAplicacao, $chaveIdempotencia) {
-            // A própria checagem interna de ConsumoInsumoService
-            // (lockForUpdate no Insumo + recheck INV-035) já garante que o
-            // estoque nunca fica negativo — herda de graça a defesa já
-            // provada, nenhum mecanismo novo.
-            $resultadoConsumo = app(ConsumoInsumoService::class)->registrar(
-                $usuarioId, $fazendaId, $insumoId, $quantidade, $dataAplicacao, $chaveIdempotencia.':consumo'
-            );
+        // ConsumoInsumoService::registrar() roda como transação própria de
+        // verdade (nunca aninhada aqui, ver nota da classe) — a própria
+        // checagem interna dele (lockForUpdate no Insumo + recheck INV-035)
+        // já garante que o estoque nunca fica negativo, herdando de graça a
+        // defesa já provada, nenhum mecanismo novo.
+        $resultadoConsumo = app(ConsumoInsumoService::class)->registrar(
+            $usuarioId, $fazendaId, $insumoId, $quantidade, $dataAplicacao, $chaveIdempotencia.':consumo'
+        );
 
-            try {
-                $evento = EventoSaude::create([
-                    'fazenda_id' => $fazendaId,
-                    'animal_ids' => array_values($animalIds),
-                    'descricao' => $descricao,
-                    'consumo_insumo_id' => $resultadoConsumo['consumo']->id,
-                    'data_aplicacao' => $dataAplicacao,
-                    'chave_idempotencia' => $chaveIdempotencia,
-                ]);
+        try {
+            $evento = EventoSaude::create([
+                'fazenda_id' => $fazendaId,
+                'animal_ids' => array_values($animalIds),
+                'descricao' => $descricao,
+                'consumo_insumo_id' => $resultadoConsumo['consumo']->id,
+                'data_aplicacao' => $dataAplicacao,
+                'chave_idempotencia' => $chaveIdempotencia,
+            ]);
 
-                $this->registrarEvento('evento_saude_registrado', $fazendaId, $chaveIdempotencia, [
-                    'tipo' => 'evento_saude_registrado', 'evento_saude_id' => $evento->id,
-                    'consumo_insumo_id' => $resultadoConsumo['consumo']->id, 'animal_ids' => array_values($animalIds),
-                ]);
+            $this->registrarEvento('evento_saude_registrado', $fazendaId, $chaveIdempotencia, [
+                'tipo' => 'evento_saude_registrado', 'evento_saude_id' => $evento->id,
+                'consumo_insumo_id' => $resultadoConsumo['consumo']->id, 'animal_ids' => array_values($animalIds),
+            ]);
 
-                return ['reenvio_detectado' => false, 'evento' => $evento];
-            } catch (QueryException $e) {
-                if ($this->violacaoDeUnicidade($e)) {
-                    return ['reenvio_detectado' => true, 'evento' => EventoSaude::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
-                }
-                throw $e;
+            return ['reenvio_detectado' => false, 'evento' => $evento];
+        } catch (QueryException $e) {
+            if ($this->violacaoDeUnicidade($e)) {
+                return ['reenvio_detectado' => true, 'evento' => EventoSaude::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
             }
-        });
+            throw $e;
+        }
     }
 
     private function garantirRelacaoComFazenda(int $usuarioId, int $fazendaId): void
