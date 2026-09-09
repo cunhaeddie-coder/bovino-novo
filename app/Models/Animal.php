@@ -11,7 +11,7 @@ class Animal extends Model
 {
     protected $table = 'animais';
 
-    protected $fillable = ['fazenda_id', 'lote_id', 'custo_aquisicao', 'status', 'data_saida', 'tipo_origem', 'mae_id', 'peso_nascimento'];
+    protected $fillable = ['fazenda_id', 'lote_id', 'custo_aquisicao', 'status', 'categoria', 'finalidade', 'data_saida', 'tipo_origem', 'mae_id', 'peso_nascimento'];
 
     protected $casts = [
         'data_saida' => 'date',
