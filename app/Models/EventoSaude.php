@@ -10,7 +10,7 @@ class EventoSaude extends Model
 {
     protected $table = 'eventos_saude';
 
-    protected $fillable = ['fazenda_id', 'animal_ids', 'descricao', 'consumo_insumo_id', 'data_aplicacao', 'chave_idempotencia'];
+    protected $fillable = ['fazenda_id', 'animal_ids', 'descricao', 'certificado', 'tipo_vacina', 'consumo_insumo_id', 'data_aplicacao', 'chave_idempotencia'];
 
     protected $casts = [
         'animal_ids' => 'array',
