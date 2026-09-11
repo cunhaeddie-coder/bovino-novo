@@ -28,6 +28,13 @@ use Illuminate\Database\QueryException;
  * podendo não enxergar a linha já commitada por ele — ModelNotFoundException
  * em vez de reenvio_detectado=true. ConsumoInsumoService precisa rodar como
  * transação própria de verdade (topo), não como savepoint de outra.
+ *
+ * Estendido pelo Vertical 18 (Vacinação Obrigatória, VERTICAL-VACINACAO-
+ * OBRIGATORIA.md/SCHEMA-CONTRATO-VACINACAO-OBRIGATORIA.md): registrar()
+ * ganha certificado/tipoVacina opcionais, ambos ou nenhum, pra declarar
+ * quando a aplicação é também uma vacina fiscalizável por lei — sem
+ * vocabulário fechado (a exigência varia por região/estado), sem mudar o
+ * comportamento de nenhuma chamada existente.
  */
 class EventoSaudeService
 {
@@ -46,7 +53,7 @@ class EventoSaudeService
         return $evento;
     }
 
-    public function registrar(int $usuarioId, int $fazendaId, array $animalIds, int $insumoId, float $quantidade, string $descricao, string $dataAplicacao, string $chaveIdempotencia): array
+    public function registrar(int $usuarioId, int $fazendaId, array $animalIds, int $insumoId, float $quantidade, string $descricao, string $dataAplicacao, string $chaveIdempotencia, ?string $certificado = null, ?string $tipoVacina = null): array
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
@@ -64,6 +71,17 @@ class EventoSaudeService
 
         if (trim($descricao) === '') {
             throw new DomainException('Evento de Saúde exige descricao.');
+        }
+
+        // SCHEMA-CONTRATO-VACINACAO-OBRIGATORIA.md §2 — guard de aplicação,
+        // não constraint de banco: certificado/tipo_vacina são ambos ou
+        // nenhum, nunca um sozinho declarando "isto é vacina fiscalizável"
+        // pela metade. Mesma disciplina de trim() já usada em chave_idempotencia/
+        // descricao — string em branco conta como ausente.
+        $certificadoInformado = $certificado !== null && trim($certificado) !== '';
+        $tipoVacinaInformado = $tipoVacina !== null && trim($tipoVacina) !== '';
+        if ($certificadoInformado !== $tipoVacinaInformado) {
+            throw new DomainException('certificado e tipo_vacina devem ser ambos informados ou ambos nulos.');
         }
 
         $animaisEncontrados = Animal::where('fazenda_id', $fazendaId)->whereIn('id', $animalIds)->count();
@@ -85,6 +103,8 @@ class EventoSaudeService
                 'fazenda_id' => $fazendaId,
                 'animal_ids' => array_values($animalIds),
                 'descricao' => $descricao,
+                'certificado' => $certificado,
+                'tipo_vacina' => $tipoVacina,
                 'consumo_insumo_id' => $resultadoConsumo['consumo']->id,
                 'data_aplicacao' => $dataAplicacao,
                 'chave_idempotencia' => $chaveIdempotencia,
@@ -93,6 +113,7 @@ class EventoSaudeService
             $this->registrarEvento('evento_saude_registrado', $fazendaId, $chaveIdempotencia, [
                 'tipo' => 'evento_saude_registrado', 'evento_saude_id' => $evento->id,
                 'consumo_insumo_id' => $resultadoConsumo['consumo']->id, 'animal_ids' => array_values($animalIds),
+                'certificado' => $certificado, 'tipo_vacina' => $tipoVacina,
             ]);
 
             return ['reenvio_detectado' => false, 'evento' => $evento];
