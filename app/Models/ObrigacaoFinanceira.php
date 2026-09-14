@@ -22,7 +22,9 @@ class ObrigacaoFinanceira extends Model
     // SCHEMA-CONTRATO-ARRENDAMENTO.md §5 — parcela_arrendamento_id é o 5º
     // membro (a parcela específica, não o contrato — um Arrendamento pode
     // ter N parcelas, cada uma com sua própria ObrigacaoFinanceira).
-    protected $fillable = ['fazenda_id', 'compra_id', 'compra_insumo_id', 'venda_id', 'folha_pagamento_id', 'parcela_arrendamento_id', 'direcao', 'valor'];
+    // SCHEMA-CONTRATO-FRETE-LOGISTICA.md §1 — ordem_frete_id é o 6º membro,
+    // sempre com direcao=a_pagar (a Fazenda deve ao Motorista).
+    protected $fillable = ['fazenda_id', 'compra_id', 'compra_insumo_id', 'venda_id', 'folha_pagamento_id', 'parcela_arrendamento_id', 'ordem_frete_id', 'direcao', 'valor'];
 
     protected $casts = [
         'valor' => 'decimal:2',
@@ -36,22 +38,25 @@ class ObrigacaoFinanceira extends Model
         // corresponder ao lado certo: a_pagar só com compra_id/compra_insumo_id,
         // a_receber só com venda_id. Guard de aplicação, não CHECK de banco
         // (Princípio 4b).
+        // SCHEMA-CONTRATO-FRETE-LOGISTICA.md §3 — ordem_frete_id é o 6º
+        // membro do grupo, sempre com direcao=a_pagar.
         $regra = function (self $obrigacao) {
             $deCompra = $obrigacao->compra_id !== null;
             $deCompraInsumo = $obrigacao->compra_insumo_id !== null;
             $deVenda = $obrigacao->venda_id !== null;
             $deFolhaPagamento = $obrigacao->folha_pagamento_id !== null;
             $deParcelaArrendamento = $obrigacao->parcela_arrendamento_id !== null;
-            if (($deCompra ? 1 : 0) + ($deCompraInsumo ? 1 : 0) + ($deVenda ? 1 : 0) + ($deFolhaPagamento ? 1 : 0) + ($deParcelaArrendamento ? 1 : 0) !== 1) {
+            $deOrdemFrete = $obrigacao->ordem_frete_id !== null;
+            if (($deCompra ? 1 : 0) + ($deCompraInsumo ? 1 : 0) + ($deVenda ? 1 : 0) + ($deFolhaPagamento ? 1 : 0) + ($deParcelaArrendamento ? 1 : 0) + ($deOrdemFrete ? 1 : 0) !== 1) {
                 throw new LogicException(
-                    'ObrigacaoFinanceira precisa ter exatamente um entre compra_id, compra_insumo_id, venda_id, folha_pagamento_id e parcela_arrendamento_id — nunca mais de um, nunca nenhum.'
+                    'ObrigacaoFinanceira precisa ter exatamente um entre compra_id, compra_insumo_id, venda_id, folha_pagamento_id, parcela_arrendamento_id e ordem_frete_id — nunca mais de um, nunca nenhum.'
                 );
             }
 
             $direcaoEsperada = $deVenda ? 'a_receber' : 'a_pagar';
             if ($obrigacao->direcao !== $direcaoEsperada) {
                 throw new LogicException(
-                    "ObrigacaoFinanceira de venda_id precisa ter direcao='a_receber'; de compra_id/compra_insumo_id/folha_pagamento_id/parcela_arrendamento_id precisa ter direcao='a_pagar'."
+                    "ObrigacaoFinanceira de venda_id precisa ter direcao='a_receber'; de compra_id/compra_insumo_id/folha_pagamento_id/parcela_arrendamento_id/ordem_frete_id precisa ter direcao='a_pagar'."
                 );
             }
         };
@@ -87,6 +92,11 @@ class ObrigacaoFinanceira extends Model
     public function parcelaArrendamento(): BelongsTo
     {
         return $this->belongsTo(ParcelaArrendamento::class);
+    }
+
+    public function ordemFrete(): BelongsTo
+    {
+        return $this->belongsTo(OrdemFrete::class);
     }
 
     public function formasPagamento(): HasMany
