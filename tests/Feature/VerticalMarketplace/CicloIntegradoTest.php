@@ -5,6 +5,7 @@ namespace Tests\Feature\VerticalMarketplace;
 use App\Models\Animal;
 use App\Models\Anuncio;
 use App\Models\Fazenda;
+use App\Models\Kyc;
 use App\Models\Papel;
 use App\Models\Usuario;
 use App\Services\NegociacaoService;
@@ -23,6 +24,7 @@ class CicloIntegradoTest extends TestCase
         $maria = Usuario::create(['nome' => 'Maria'])->id;
         Papel::create(['usuario_id' => $joao, 'fazenda_id' => $fazendaVendedora, 'papel' => 'dono']);
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
+        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1200,
@@ -55,6 +57,7 @@ class CicloIntegradoTest extends TestCase
         $fazendaCompradora = Fazenda::create(['nome' => 'Sítio Alegria'])->id;
         $maria = Usuario::create(['nome' => 'Maria'])->id;
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
+        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1000,
