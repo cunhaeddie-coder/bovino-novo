@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Usuario extends Model
 {
-    protected $fillable = ['nome'];
+    protected $fillable = ['nome', 'eh_administrador'];
+
+    protected $casts = [
+        'eh_administrador' => 'boolean',
+    ];
 
     public function papeis(): HasMany
     {
