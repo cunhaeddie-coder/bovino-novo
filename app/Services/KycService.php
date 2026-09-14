@@ -3,47 +3,48 @@
 namespace App\Services;
 
 use App\Models\EmbargoIbama;
+use App\Models\Fazenda;
 use App\Models\Kyc;
 use App\Models\Usuario;
 use DomainException;
 use Illuminate\Database\QueryException;
 
 /**
- * VERTICAL-KYC.md / SCHEMA-CONTRATO-KYC.md — núcleo do Vertical 23. Kyc é
- * 1:1 com Fazenda, decidido sempre de forma síncrona (achado de LAB-FA-028:
- * sem etapa manual intermediária). Corte mínimo: checksum de CPF/CNPJ (INV-048)
- * + tabela local de embargos IBAMA — sem Receita Federal, IE, selfie/Didit,
+ * VERTICAL-KYC.md / SCHEMA-CONTRATO-KYC.md — núcleo do Vertical 23,
+ * reaberto pelo Vertical 25 (Titular): Kyc é 1:1 com Titular, não mais com
+ * Fazenda. submeter() não recebe mais documento/tipoDocumento — isso agora
+ * vive só em Titular, declarado por TitularService::vincular() antes.
+ * Decidido sempre de forma síncrona (achado de LAB-FA-028: sem etapa
+ * manual intermediária). Corte mínimo: checksum de CPF/CNPJ (INV-048) +
+ * tabela local de embargos IBAMA — sem Receita Federal, IE, selfie/Didit,
  * sem chamada de rede real.
  */
 class KycService
 {
-    public function submeter(int $usuarioId, int $fazendaId, string $documento, string $tipoDocumento): Kyc
+    public function submeter(int $usuarioId, int $fazendaId): Kyc
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
-        if (! in_array($tipoDocumento, ['cpf', 'cnpj'], true)) {
-            throw new DomainException("tipo_documento precisa ser 'cpf' ou 'cnpj' (recebido: {$tipoDocumento}).");
+        $fazenda = Fazenda::with('titular')->findOrFail($fazendaId);
+        if ($fazenda->titular_id === null) {
+            throw new DomainException("Fazenda {$fazendaId} sem Titular vinculado — vincule antes de submeter KYC.");
         }
 
-        $documentoLimpo = preg_replace('/\D/', '', $documento) ?? '';
-        if ($documentoLimpo === '') {
-            throw new DomainException('documento não pode ser vazio.');
-        }
-
-        $checksumValido = $tipoDocumento === 'cpf' ? $this->cpfValido($documentoLimpo) : $this->cnpjValido($documentoLimpo);
+        $titular = $fazenda->titular;
+        $checksumValido = $titular->tipo_documento === 'cpf'
+            ? $this->cpfValido($titular->documento)
+            : $this->cnpjValido($titular->documento);
 
         if (! $checksumValido) {
-            return $this->upsertKyc($fazendaId, [
-                'documento' => $documentoLimpo, 'tipo_documento' => $tipoDocumento, 'status' => 'reprovado', 'motivo_reprovacao' => 'documento_invalido', 'verificado_em' => now(),
+            return $this->upsertKyc($titular->id, [
+                'status' => 'reprovado', 'motivo_reprovacao' => 'documento_invalido', 'verificado_em' => now(),
             ]);
         }
 
         // INV-048 — só situacao=ativo reprova; cancelado nunca bloqueia.
-        $embargado = EmbargoIbama::where('documento', $documentoLimpo)->where('situacao', 'ativo')->exists();
+        $embargado = EmbargoIbama::where('documento', $titular->documento)->where('situacao', 'ativo')->exists();
 
-        return $this->upsertKyc($fazendaId, [
-            'documento' => $documentoLimpo,
-            'tipo_documento' => $tipoDocumento,
+        return $this->upsertKyc($titular->id, [
             'status' => $embargado ? 'reprovado' : 'aprovado',
             'motivo_reprovacao' => $embargado ? 'embargo_ibama' : null,
             'verificado_em' => now(),
@@ -52,19 +53,17 @@ class KycService
 
     // Achado do Spike 007 Extensão 24 (14/09/2026): Kyc::updateOrCreate()
     // sozinho é um SELECT-então-INSERT/UPDATE sem lock — 2 submeter()
-    // concorrentes pra uma Fazenda sem Kyc ainda podiam, em teoria, os dois
-    // tentar INSERT, e o perdedor bateria em UNIQUE(fazenda_id) sem captura
-    // (diferente de todo outro Service do projeto). Não observado quebrando
-    // em 5 execuções reais, mas corrigido por consistência com o padrão já
-    // estabelecido (violacaoDeUnicidade + retry), nunca por suposição de
-    // domínio novo.
-    private function upsertKyc(int $fazendaId, array $valores): Kyc
+    // concorrentes pro mesmo Titular sem Kyc ainda podiam, em teoria, os
+    // dois tentar INSERT, e o perdedor bateria em UNIQUE(titular_id) sem
+    // captura. Corrigido por consistência com o padrão já estabelecido
+    // (violacaoDeUnicidade + retry), nunca por suposição de domínio novo.
+    private function upsertKyc(int $titularId, array $valores): Kyc
     {
         try {
-            return Kyc::updateOrCreate(['fazenda_id' => $fazendaId], $valores);
+            return Kyc::updateOrCreate(['titular_id' => $titularId], $valores);
         } catch (QueryException $e) {
             if ($this->violacaoDeUnicidade($e)) {
-                $kyc = Kyc::where('fazenda_id', $fazendaId)->firstOrFail();
+                $kyc = Kyc::where('titular_id', $titularId)->firstOrFail();
                 $kyc->update($valores);
 
                 return $kyc->fresh();

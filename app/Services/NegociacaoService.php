@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Anuncio;
 use App\Models\EventoDominio;
+use App\Models\Fazenda;
 use App\Models\Fornecedor;
 use App\Models\Kyc;
 use App\Models\Negociacao;
@@ -271,7 +272,12 @@ class NegociacaoService
     // (AnuncioService::publicar(), INV-046).
     private function garantirKycAprovado(int $fazendaId): void
     {
-        $aprovado = Kyc::where('fazenda_id', $fazendaId)->where('status', 'aprovado')->exists();
+        $fazenda = Fazenda::findOrFail($fazendaId);
+        if ($fazenda->titular_id === null) {
+            throw new DomainException("Operação recusada: Fazenda {$fazendaId} sem Titular vinculado — não pode propor Negociação.");
+        }
+
+        $aprovado = Kyc::where('titular_id', $fazenda->titular_id)->where('status', 'aprovado')->exists();
         if (! $aprovado) {
             throw new DomainException("Operação recusada: Fazenda {$fazendaId} não tem KYC aprovado — não pode propor Negociação.");
         }

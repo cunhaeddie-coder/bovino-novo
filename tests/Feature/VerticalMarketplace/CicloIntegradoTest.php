@@ -7,6 +7,7 @@ use App\Models\Anuncio;
 use App\Models\Fazenda;
 use App\Models\Kyc;
 use App\Models\Papel;
+use App\Models\Titular;
 use App\Models\Usuario;
 use App\Services\NegociacaoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +17,14 @@ class CicloIntegradoTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Vertical 25 (Titular) reabriu KYC — Kyc agora é por Titular, não por Fazenda. */
+    private function aprovarKyc(int $fazendaId): void
+    {
+        $titular = Titular::create(['documento' => '111.444.777-35'.uniqid(), 'tipo_documento' => 'cpf']);
+        Fazenda::where('id', $fazendaId)->update(['titular_id' => $titular->id]);
+        Kyc::create(['titular_id' => $titular->id, 'status' => 'aprovado', 'verificado_em' => now()]);
+    }
+
     public function test_ciclo_completo_propor_aceitar_confirmar_e_visivel_pelos_2_lados(): void
     {
         $fazendaVendedora = Fazenda::create(['nome' => 'Fazenda Alegria'])->id;
@@ -24,7 +33,7 @@ class CicloIntegradoTest extends TestCase
         $maria = Usuario::create(['nome' => 'Maria'])->id;
         Papel::create(['usuario_id' => $joao, 'fazenda_id' => $fazendaVendedora, 'papel' => 'dono']);
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
-        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
+        $this->aprovarKyc($fazendaCompradora);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1200,
@@ -57,7 +66,7 @@ class CicloIntegradoTest extends TestCase
         $fazendaCompradora = Fazenda::create(['nome' => 'Sítio Alegria'])->id;
         $maria = Usuario::create(['nome' => 'Maria'])->id;
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
-        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
+        $this->aprovarKyc($fazendaCompradora);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1000,

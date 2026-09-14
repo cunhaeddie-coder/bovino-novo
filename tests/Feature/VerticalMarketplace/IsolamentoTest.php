@@ -7,6 +7,7 @@ use App\Models\Anuncio;
 use App\Models\Fazenda;
 use App\Models\Kyc;
 use App\Models\Papel;
+use App\Models\Titular;
 use App\Models\Usuario;
 use App\Services\NegociacaoService;
 use DomainException;
@@ -21,6 +22,14 @@ class IsolamentoTest extends TestCase
 {
     use RefreshDatabase;
 
+    /** Vertical 25 (Titular) reabriu KYC — Kyc agora é por Titular, não por Fazenda. */
+    private function aprovarKyc(int $fazendaId): void
+    {
+        $titular = Titular::create(['documento' => uniqid('doc'), 'tipo_documento' => 'cpf']);
+        Fazenda::where('id', $fazendaId)->update(['titular_id' => $titular->id]);
+        Kyc::create(['titular_id' => $titular->id, 'status' => 'aprovado', 'verificado_em' => now()]);
+    }
+
     public function test_usuario_de_terceira_fazenda_nao_ve_a_negociacao(): void
     {
         $fazendaVendedora = Fazenda::create(['nome' => 'Fazenda Alegria'])->id;
@@ -30,7 +39,7 @@ class IsolamentoTest extends TestCase
         $intruso = Usuario::create(['nome' => 'Intruso'])->id;
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
         Papel::create(['usuario_id' => $intruso, 'fazenda_id' => $terceiraFazenda, 'papel' => 'dono']);
-        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
+        $this->aprovarKyc($fazendaCompradora);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1000,
@@ -71,7 +80,7 @@ class IsolamentoTest extends TestCase
         $maria = Usuario::create(['nome' => 'Maria'])->id;
         $intruso = Usuario::create(['nome' => 'Intruso'])->id;
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
-        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
+        $this->aprovarKyc($fazendaCompradora);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1000,

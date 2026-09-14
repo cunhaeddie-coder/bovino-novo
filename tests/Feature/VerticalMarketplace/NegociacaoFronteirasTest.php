@@ -7,6 +7,7 @@ use App\Models\Anuncio;
 use App\Models\Fazenda;
 use App\Models\Kyc;
 use App\Models\Papel;
+use App\Models\Titular;
 use App\Models\Usuario;
 use App\Services\NegociacaoService;
 use DomainException;
@@ -36,7 +37,9 @@ class NegociacaoFronteirasTest extends TestCase
         $this->maria = Usuario::create(['nome' => 'Maria'])->id;
         Papel::create(['usuario_id' => $this->joao, 'fazenda_id' => $this->fazendaVendedora, 'papel' => 'dono']);
         Papel::create(['usuario_id' => $this->maria, 'fazenda_id' => $this->fazendaCompradora, 'papel' => 'dono']);
-        Kyc::create(['fazenda_id' => $this->fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
+        $titular = Titular::create(['documento' => uniqid('doc'), 'tipo_documento' => 'cpf']);
+        Fazenda::where('id', $this->fazendaCompradora)->update(['titular_id' => $titular->id]);
+        Kyc::create(['titular_id' => $titular->id, 'status' => 'aprovado', 'verificado_em' => now()]);
 
         $this->anuncio = Anuncio::create([
             'fazenda_id' => $this->fazendaVendedora, 'preco_total' => 1000,
