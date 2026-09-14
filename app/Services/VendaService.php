@@ -136,6 +136,12 @@ class VendaService
                     'receita_liquida' => $receitaLiquida,
                 ]);
 
+                // SCHEMA-CONTRATO-INTELIGENCIA-MERCADO.md §5 — pivot venda_animal,
+                // pré-requisito pra consultar Venda pelo lado do Animal (cotações
+                // por raça/estado). Acompanha o que este método já decidiu, nunca
+                // reabre nenhuma checagem nova.
+                $venda->animais()->attach($idsVendidos);
+
                 // SCHEMA-CONTRATO-FORMA-PAGAMENTO.md §3, Opção A — Venda
                 // nunca gerou nenhuma Obrigação Financeira antes desta
                 // frente (assimetria real com Compra, achada só agora).
@@ -264,6 +270,13 @@ class VendaService
                     'fiscal_e_premissa' => $ehPremissa,
                     'receita_liquida' => $novaReceitaLiquida,
                 ]);
+
+                // SCHEMA-CONTRATO-INTELIGENCIA-MERCADO.md §5 — a correção é sua
+                // própria linha (INV-026), então ganha sua própria pivot
+                // venda_animal, igual a registrar(). Sem isso, a query de
+                // cotações (que passa a ignorar o original já corrigido) ficaria
+                // sem nenhuma linha pra esta venda.
+                $correcao->animais()->attach($novosAnimalIds);
 
                 // Mesmo padrão de registrar() — a correção é um novo fato
                 // (venda imutável, INV-026), então ganha sua própria

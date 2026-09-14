@@ -6,6 +6,7 @@ use App\Models\Builders\VendaBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
@@ -60,6 +61,15 @@ class Venda extends Model
     public function obrigacaoFinanceira(): HasOne
     {
         return $this->hasOne(ObrigacaoFinanceira::class);
+    }
+
+    // SCHEMA-CONTRATO-INTELIGENCIA-MERCADO.md §1 — resolve a lacuna que
+    // SCHEMA-CONTRATO-VENDA.md §11 já tinha nomeado: consulta pelo lado do
+    // Animal. Populada por VendaService::registrar()/corrigir(), nunca
+    // reconstruída a partir de animal_ids em tempo de leitura.
+    public function animais(): BelongsToMany
+    {
+        return $this->belongsToMany(Animal::class, 'venda_animal');
     }
 
     public function newEloquentBuilder($query): Builder

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Fazenda extends Model
 {
-    protected $fillable = ['nome'];
+    protected $fillable = ['nome', 'estado'];
 
     public function papeis(): HasMany
     {
