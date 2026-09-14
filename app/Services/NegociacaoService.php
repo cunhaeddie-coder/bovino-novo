@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Anuncio;
 use App\Models\EventoDominio;
 use App\Models\Fornecedor;
+use App\Models\Kyc;
 use App\Models\Negociacao;
 use App\Models\Usuario;
 use DomainException;
@@ -43,6 +44,7 @@ class NegociacaoService
     public function propor(int $usuarioId, int $anuncioId, int $fazendaCompradoraId, float $precoProposto, string $chaveIdempotencia): array
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaCompradoraId);
+        $this->garantirKycAprovado($fazendaCompradoraId);
 
         if (trim($chaveIdempotencia) === '') {
             throw new DomainException('chave_idempotencia não pode ser vazia.');
@@ -260,6 +262,18 @@ class NegociacaoService
         $usuario = Usuario::findOrFail($usuarioId);
         if (! $usuario->temRelacaoComFazenda($fazendaId)) {
             throw new DomainException("Operação recusada: usuário {$usuarioId} sem relação com a Fazenda {$fazendaId}.");
+        }
+    }
+
+    // INV-047 — SCHEMA-CONTRATO-KYC.md §10 (reabertura). Só checado em
+    // propor() — aceitar()/confirmarVendedor()/confirmarComprador() não
+    // mudam, o lado vendedor já foi checado na publicação do Anúncio
+    // (AnuncioService::publicar(), INV-046).
+    private function garantirKycAprovado(int $fazendaId): void
+    {
+        $aprovado = Kyc::where('fazenda_id', $fazendaId)->where('status', 'aprovado')->exists();
+        if (! $aprovado) {
+            throw new DomainException("Operação recusada: Fazenda {$fazendaId} não tem KYC aprovado — não pode propor Negociação.");
         }
     }
 

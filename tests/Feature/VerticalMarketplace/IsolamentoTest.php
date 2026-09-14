@@ -5,6 +5,7 @@ namespace Tests\Feature\VerticalMarketplace;
 use App\Models\Animal;
 use App\Models\Anuncio;
 use App\Models\Fazenda;
+use App\Models\Kyc;
 use App\Models\Papel;
 use App\Models\Usuario;
 use App\Services\NegociacaoService;
@@ -29,6 +30,7 @@ class IsolamentoTest extends TestCase
         $intruso = Usuario::create(['nome' => 'Intruso'])->id;
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
         Papel::create(['usuario_id' => $intruso, 'fazenda_id' => $terceiraFazenda, 'papel' => 'dono']);
+        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1000,
@@ -69,6 +71,7 @@ class IsolamentoTest extends TestCase
         $maria = Usuario::create(['nome' => 'Maria'])->id;
         $intruso = Usuario::create(['nome' => 'Intruso'])->id;
         Papel::create(['usuario_id' => $maria, 'fazenda_id' => $fazendaCompradora, 'papel' => 'dono']);
+        Kyc::create(['fazenda_id' => $fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
 
         $anuncio = Anuncio::create([
             'fazenda_id' => $fazendaVendedora, 'preco_total' => 1000,

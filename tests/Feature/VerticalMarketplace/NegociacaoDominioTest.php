@@ -6,6 +6,7 @@ use App\Models\Animal;
 use App\Models\Anuncio;
 use App\Models\Fazenda;
 use App\Models\Fornecedor;
+use App\Models\Kyc;
 use App\Models\Papel;
 use App\Models\Usuario;
 use App\Services\NegociacaoService;
@@ -39,6 +40,7 @@ class NegociacaoDominioTest extends TestCase
         $this->maria = Usuario::create(['nome' => 'Maria'])->id;
         Papel::create(['usuario_id' => $this->joao, 'fazenda_id' => $this->fazendaVendedora, 'papel' => 'dono']);
         Papel::create(['usuario_id' => $this->maria, 'fazenda_id' => $this->fazendaCompradora, 'papel' => 'dono']);
+        Kyc::create(['fazenda_id' => $this->fazendaCompradora, 'documento' => '11144477735', 'tipo_documento' => 'cpf', 'status' => 'aprovado', 'verificado_em' => now()]);
 
         $this->anuncio = Anuncio::create([
             'fazenda_id' => $this->fazendaVendedora, 'preco_total' => 1000,
