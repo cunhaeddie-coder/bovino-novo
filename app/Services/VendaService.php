@@ -338,9 +338,18 @@ class VendaService
     }
 
     // VERTICAL-FORMA-PAGAMENTO.md §3 — mesmo padrão de CompraService/CompraInsumoService.
+    //
+    // SCHEMA-CONTRATO-CARTEIRA.md §4 — achado real ao implementar o
+    // Vertical 27: à vista nasce JÁ paga, sem nunca passar por
+    // FormaPagamentoService::liquidar() — antes desta correção, o evento
+    // forma_pagamento_liquidada nunca era emitido pra este caminho (o mais
+    // comum do projeto), deixando a Carteira cega pra toda Venda à vista.
+    // valor_liquidado_reais também passa a ser gravado aqui, mesmo
+    // cálculo que liquidar() faz pra unidade=dinheiro (valor = valor
+    // liquidado, sem conversão de arroba).
     private function criarFormaPagamentoAVista(ObrigacaoFinanceira $obrigacao, float $valorTotal, string $data): FormaPagamento
     {
-        return FormaPagamento::create([
+        $forma = FormaPagamento::create([
             'obrigacao_financeira_id' => $obrigacao->id,
             'nome' => 'à vista',
             'unidade' => 'dinheiro',
@@ -348,7 +357,15 @@ class VendaService
             'data' => $data,
             'vencimento' => $data,
             'pago_em' => $data,
+            'valor_liquidado_reais' => $valorTotal,
         ]);
+
+        $this->registrarEvento('forma_pagamento_liquidada', $obrigacao->fazenda_id, "forma-pagamento-{$forma->id}", [
+            'tipo' => 'forma_pagamento_liquidada', 'forma_pagamento_id' => $forma->id,
+            'obrigacao_financeira_id' => $obrigacao->id, 'fazenda_id' => $obrigacao->fazenda_id,
+        ]);
+
+        return $forma;
     }
 
     private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio

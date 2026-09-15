@@ -23,4 +23,13 @@ class Usuario extends Model
     {
         return $this->papeis()->where('fazenda_id', $fazendaId)->exists();
     }
+
+    // SCHEMA-CONTRATO-CARTEIRA.md §6 — Titular não tem Papel próprio; a
+    // relação sempre passa por pelo menos uma Fazenda daquele Titular.
+    public function temRelacaoComTitular(int $titularId): bool
+    {
+        return Fazenda::where('titular_id', $titularId)
+            ->whereIn('id', $this->papeis()->pluck('fazenda_id'))
+            ->exists();
+    }
 }

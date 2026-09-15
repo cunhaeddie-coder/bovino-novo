@@ -21,4 +21,9 @@ class Titular extends Model
     {
         return $this->hasOne(Kyc::class);
     }
+
+    public function contas(): HasMany
+    {
+        return $this->hasMany(Conta::class);
+    }
 }
