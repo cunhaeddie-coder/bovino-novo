@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\EventoDominio;
 use App\Models\ObservabilidadeVarredura;
 use Illuminate\Support\Collection;
+use Throwable;
 
 /**
  * O consumidor da consequência desacoplada (MODELO-DE-EVENTOS.md, INV-027).
@@ -19,6 +20,12 @@ use Illuminate\Support\Collection;
  * Fiscal-documento/Auditoria/Notificação reais (VERTICAL-VENDA.md §4) ficam
  * fora do corte mínimo do vertical 1 — aqui só o mecanismo de entrega
  * garantida e idempotente é provado, não o conteúdo de cada consequência.
+ *
+ * SCHEMA-CONTRATO-CARTEIRA.md §4 — 1º consumidor real com efeito colateral
+ * de negócio (`forma_pagamento_liquidada` → Lançamento). Isolamento por
+ * evento: uma falha marca só aquele evento `falhou_reprocessar` (coluna já
+ * prevista desde o início, nunca exercida até agora), nunca aborta o lote
+ * inteiro — os outros eventos pendentes continuam sendo processados.
  */
 class OutboxService
 {
@@ -34,7 +41,16 @@ class OutboxService
 
     public function processar(EventoDominio $evento): EventoDominio
     {
-        $evento->update(['status_consequencia' => 'concluido']);
+        try {
+            match ($evento->tipo) {
+                'forma_pagamento_liquidada' => app(LancamentoService::class)->processarLiquidacao($evento),
+                default => null,
+            };
+
+            $evento->update(['status_consequencia' => 'concluido']);
+        } catch (Throwable $e) {
+            $evento->update(['status_consequencia' => 'falhou_reprocessar']);
+        }
 
         return $evento;
     }
@@ -42,8 +58,9 @@ class OutboxService
     /**
      * OBSERVABILIDADE-MINIMA-VENDA.md §2 — os quatro sinais do corte mínimo
      * mais scanner_last_run_at. `outbox_failed_total`/tentativas/erro ficam
-     * de fora (§3): eventos_dominio não tem coluna pra isso, e processar()
-     * hoje nunca falha (nenhum consumidor real ainda pode falhar).
+     * de fora (§3): eventos_dominio não tem coluna pra contagem de
+     * tentativas — só o status `falhou_reprocessar` (agora exercido pela
+     * 1ª vez pelo consumidor da Carteira).
      */
     public function status(): array
     {

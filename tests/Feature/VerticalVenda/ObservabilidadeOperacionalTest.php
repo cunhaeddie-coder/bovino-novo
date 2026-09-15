@@ -53,7 +53,12 @@ class ObservabilidadeOperacionalTest extends TestCase
 
         $status = app(OutboxService::class)->status();
 
-        $this->assertSame(1, $status['outbox_pending'], 'o evento criado pela Venda real precisa aparecer como pendente');
+        // SCHEMA-CONTRATO-CARTEIRA.md §4 (Vertical 27) — uma Venda à vista
+        // agora emite 2 eventos: venda_concluida (original) e
+        // forma_pagamento_liquidada (achado corrigido — a FormaPagamento à
+        // vista nasce já paga, sem nunca passar por liquidar(), então nunca
+        // emitia esse evento antes).
+        $this->assertSame(2, $status['outbox_pending'], 'os eventos criados pela Venda real precisam aparecer como pendentes');
         $this->assertGreaterThanOrEqual(2, $status['outbox_oldest_pending_age_seconds'], 'o evento precisa estar envelhecendo de verdade');
         $this->assertEquals(
             $scannerAntesDoAtaque->toDateTimeString(),
@@ -70,7 +75,9 @@ class ObservabilidadeOperacionalTest extends TestCase
         sleep(2);
 
         // Confirma que o "ataque" realmente deixou rastro antes de religar.
-        $this->assertSame(1, app(OutboxService::class)->status()['outbox_pending']);
+        // Vertical 27 — 2 eventos por Venda à vista (venda_concluida +
+        // forma_pagamento_liquidada), mesmo achado do teste da Fase 2.
+        $this->assertSame(2, app(OutboxService::class)->status()['outbox_pending']);
 
         // Religa o processador — mesmo comando real, nada simulado.
         Artisan::call('eventos:processar');
@@ -78,7 +85,7 @@ class ObservabilidadeOperacionalTest extends TestCase
         $status = app(OutboxService::class)->status();
 
         $this->assertSame(0, $status['outbox_pending'], 'o evento pendente precisa ter sido processado');
-        $this->assertSame(1, $status['outbox_processed_total']);
+        $this->assertSame(2, $status['outbox_processed_total']);
         $this->assertNotNull($status['outbox_last_success_at']);
         $this->assertNotNull($status['scanner_last_run_at']);
     }
