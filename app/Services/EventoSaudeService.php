@@ -35,6 +35,13 @@ use Illuminate\Database\QueryException;
  * quando a aplicação é também uma vacina fiscalizável por lei — sem
  * vocabulário fechado (a exigência varia por região/estado), sem mudar o
  * comportamento de nenhuma chamada existente.
+ *
+ * Estendido pelo Vertical 31 (Nutrição, VERTICAL-NUTRICAO.md/SCHEMA-
+ * CONTRATO-NUTRICAO.md): registrar() ganha epoca opcional (texto livre,
+ * sem par que exija coerência) pra declarar a época do ano de um plano
+ * nutricional — ingrediente já vinculado a Insumo real e aplicação a grupo
+ * de Animais já resolvidos pelo Vertical 11, única lacuna genuína era o
+ * dado sazonal.
  */
 class EventoSaudeService
 {
@@ -53,7 +60,7 @@ class EventoSaudeService
         return $evento;
     }
 
-    public function registrar(int $usuarioId, int $fazendaId, array $animalIds, int $insumoId, float $quantidade, string $descricao, string $dataAplicacao, string $chaveIdempotencia, ?string $certificado = null, ?string $tipoVacina = null): array
+    public function registrar(int $usuarioId, int $fazendaId, array $animalIds, int $insumoId, float $quantidade, string $descricao, string $dataAplicacao, string $chaveIdempotencia, ?string $certificado = null, ?string $tipoVacina = null, ?string $epoca = null): array
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
@@ -105,6 +112,7 @@ class EventoSaudeService
                 'descricao' => $descricao,
                 'certificado' => $certificado,
                 'tipo_vacina' => $tipoVacina,
+                'epoca' => $epoca,
                 'consumo_insumo_id' => $resultadoConsumo['consumo']->id,
                 'data_aplicacao' => $dataAplicacao,
                 'chave_idempotencia' => $chaveIdempotencia,
@@ -113,7 +121,7 @@ class EventoSaudeService
             $this->registrarEvento('evento_saude_registrado', $fazendaId, $chaveIdempotencia, [
                 'tipo' => 'evento_saude_registrado', 'evento_saude_id' => $evento->id,
                 'consumo_insumo_id' => $resultadoConsumo['consumo']->id, 'animal_ids' => array_values($animalIds),
-                'certificado' => $certificado, 'tipo_vacina' => $tipoVacina,
+                'certificado' => $certificado, 'tipo_vacina' => $tipoVacina, 'epoca' => $epoca,
             ]);
 
             return ['reenvio_detectado' => false, 'evento' => $evento];
