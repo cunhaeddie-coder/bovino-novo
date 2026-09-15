@@ -2,11 +2,16 @@
 
 namespace App\Services;
 
+use App\Models\AcertoRescisao;
 use App\Models\EventoDominio;
+use App\Models\FormaPagamento;
 use App\Models\Funcionario;
+use App\Models\ItemAcertoRescisao;
+use App\Models\ObrigacaoFinanceira;
 use App\Models\Usuario;
 use DomainException;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 /**
  * O núcleo do cadastro do Vertical 10 (Folha de Pagamento), nascido de
@@ -14,6 +19,14 @@ use Illuminate\Database\QueryException;
  * pra código real. Funcionario é entidade mutável (cadastro com lifecycle),
  * não um evento imutável — sem lockForUpdate() (sem disputa de recurso
  * compartilhado, mesma categoria de risco de NascimentoService).
+ *
+ * Estendido pelo Vertical 32 (Acerto de Rescisão, VERTICAL-ACERTO-
+ * RESCISAO.md/SCHEMA-CONTRATO-ACERTO-RESCISAO.md): registrarCustoDesligamento()
+ * — reformulação de escopo do produtor, o sistema nunca calcula verba
+ * rescisória (CLT fica com a contabilidade), só registra os custos que o
+ * produtor já apurou por fora. Mesmo formato de TransferenciaFazendaService/
+ * GtaService: 1 AcertoRescisao-pai com 1 chave_idempotencia real, tudo-ou-
+ * nada sobre a lista de itens.
  */
 class FuncionarioService
 {
@@ -92,6 +105,100 @@ class FuncionarioService
         ]);
 
         return $funcionario->fresh();
+    }
+
+    /**
+     * @param  array<int, array{nome: string, valor: float, vencimento: string}>  $itens
+     */
+    public function registrarCustoDesligamento(int $usuarioId, int $funcionarioId, array $itens, string $chaveIdempotencia): array
+    {
+        $funcionario = Funcionario::find($funcionarioId);
+        if (! $funcionario) {
+            throw new DomainException("Funcionario #{$funcionarioId} não encontrado.");
+        }
+
+        $this->garantirRelacaoComFazenda($usuarioId, $funcionario->fazenda_id);
+
+        if (trim($chaveIdempotencia) === '') {
+            throw new DomainException('chave_idempotencia não pode ser vazia.');
+        }
+
+        if ($existente = AcertoRescisao::where('funcionario_id', $funcionarioId)->where('chave_idempotencia', $chaveIdempotencia)->first()) {
+            return ['reenvio_detectado' => true, 'acerto' => $existente];
+        }
+
+        // VERTICAL-ACERTO-RESCISAO.md §2/§3 — guard de aplicação: registrar
+        // custo de acerto pra alguém ainda ativo não corresponde a nenhum
+        // fato real do domínio (o acerto é consequência do desligamento).
+        if ($funcionario->status !== 'desligado') {
+            throw new DomainException("Funcionario #{$funcionarioId} precisa estar desligado antes de registrar custo de acerto.");
+        }
+
+        if (empty($itens)) {
+            throw new DomainException('Acerto de rescisão precisa de pelo menos um item.');
+        }
+
+        foreach ($itens as $item) {
+            if (trim($item['nome'] ?? '') === '') {
+                throw new DomainException('Todo item do acerto exige nome.');
+            }
+            if (($item['valor'] ?? 0) <= 0) {
+                throw new DomainException("Item \"{$item['nome']}\" precisa ter valor positivo.");
+            }
+        }
+
+        try {
+            return DB::transaction(function () use ($funcionario, $itens, $chaveIdempotencia) {
+                $acerto = AcertoRescisao::create([
+                    'fazenda_id' => $funcionario->fazenda_id,
+                    'funcionario_id' => $funcionario->id,
+                    'chave_idempotencia' => $chaveIdempotencia,
+                ]);
+
+                $itensCriados = [];
+                foreach ($itens as $item) {
+                    $itemCriado = ItemAcertoRescisao::create([
+                        'fazenda_id' => $funcionario->fazenda_id,
+                        'acerto_rescisao_id' => $acerto->id,
+                        'nome' => $item['nome'],
+                        'valor' => $item['valor'],
+                        'vencimento' => $item['vencimento'],
+                    ]);
+
+                    $obrigacao = ObrigacaoFinanceira::create([
+                        'fazenda_id' => $funcionario->fazenda_id,
+                        'item_acerto_rescisao_id' => $itemCriado->id,
+                        'direcao' => 'a_pagar',
+                        'valor' => $item['valor'],
+                    ]);
+
+                    FormaPagamento::create([
+                        'obrigacao_financeira_id' => $obrigacao->id,
+                        'nome' => $item['nome'],
+                        'unidade' => 'dinheiro',
+                        'valor' => $item['valor'],
+                        'data' => now(),
+                        'vencimento' => $item['vencimento'],
+                        'pago_em' => null,
+                    ]);
+
+                    $itensCriados[] = $itemCriado;
+                }
+
+                $this->registrarEvento('custo_desligamento_registrado', $funcionario->fazenda_id, $chaveIdempotencia, [
+                    'tipo' => 'custo_desligamento_registrado', 'funcionario_id' => $funcionario->id,
+                    'acerto_rescisao_id' => $acerto->id,
+                    'itens' => array_map(fn (ItemAcertoRescisao $i) => ['nome' => $i->nome, 'valor' => (string) $i->valor], $itensCriados),
+                ]);
+
+                return ['reenvio_detectado' => false, 'acerto' => $acerto, 'itens' => $itensCriados];
+            });
+        } catch (QueryException $e) {
+            if ($this->violacaoDeUnicidade($e)) {
+                return ['reenvio_detectado' => true, 'acerto' => AcertoRescisao::where('funcionario_id', $funcionarioId)->where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
+            }
+            throw $e;
+        }
     }
 
     private function garantirRelacaoComFazenda(int $usuarioId, int $fazendaId): void

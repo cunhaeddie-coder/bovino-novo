@@ -46,4 +46,9 @@ class Funcionario extends Model
     {
         return $this->hasMany(FolhaPagamento::class);
     }
+
+    public function acertosRescisao(): HasMany
+    {
+        return $this->hasMany(AcertoRescisao::class);
+    }
 }
