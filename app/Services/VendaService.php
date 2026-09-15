@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Animal;
 use App\Models\EventoDominio;
 use App\Models\FormaPagamento;
+use App\Models\LancamentoFiscal;
 use App\Models\Lote;
 use App\Models\ObrigacaoFinanceira;
 use App\Models\ResponsavelFiscal;
@@ -120,7 +121,7 @@ class VendaService
                 }
                 $cpv = round($cpv, 2);
 
-                [$deducaoFiscal, $ehPremissa] = $this->calcularDeducaoFiscal($fazendaId, $valorBruto);
+                [$deducaoFiscal, $ehPremissa, $taxaAplicada] = $this->calcularDeducaoFiscal($fazendaId, $valorBruto);
                 $receitaLiquida = round($valorBruto - $cpv - $deducaoFiscal, 2);
 
                 $venda = Venda::create([
@@ -134,6 +135,18 @@ class VendaService
                     'deducao_fiscal' => $deducaoFiscal,
                     'fiscal_e_premissa' => $ehPremissa,
                     'receita_liquida' => $receitaLiquida,
+                ]);
+
+                // SCHEMA-CONTRATO-CONFIGURACAO-FISCAL.md §4 — achado real,
+                // reabre o Vertical 1: o fato fiscal nunca ficava
+                // persistido em lugar nenhum (LAB-SA-001/013/021), só
+                // dentro do cálculo de receita_liquida. INV-061.
+                LancamentoFiscal::create([
+                    'venda_id' => $venda->id,
+                    'deducao_fiscal' => $deducaoFiscal,
+                    'taxa_aplicada' => $taxaAplicada,
+                    'fiscal_e_premissa' => $ehPremissa,
+                    'data_lancamento' => now(),
                 ]);
 
                 // SCHEMA-CONTRATO-INTELIGENCIA-MERCADO.md §5 — pivot venda_animal,
@@ -250,7 +263,7 @@ class VendaService
                     }
                 }
 
-                [$deducaoFiscal, $ehPremissa] = $this->calcularDeducaoFiscal($fazendaId, $novoValorBruto);
+                [$deducaoFiscal, $ehPremissa, $taxaAplicada] = $this->calcularDeducaoFiscal($fazendaId, $novoValorBruto);
                 $novoCpv = round($custoUnitarioOriginal * count($novosAnimalIds), 2);
                 $novaReceitaLiquida = round($novoValorBruto - $novoCpv - $deducaoFiscal, 2);
 
@@ -269,6 +282,17 @@ class VendaService
                     'deducao_fiscal' => $deducaoFiscal,
                     'fiscal_e_premissa' => $ehPremissa,
                     'receita_liquida' => $novaReceitaLiquida,
+                ]);
+
+                // SCHEMA-CONTRATO-CONFIGURACAO-FISCAL.md §4 — a correção é
+                // seu próprio fato (INV-026), ganha seu próprio
+                // LancamentoFiscal, igual a registrar(). INV-061.
+                LancamentoFiscal::create([
+                    'venda_id' => $correcao->id,
+                    'deducao_fiscal' => $deducaoFiscal,
+                    'taxa_aplicada' => $taxaAplicada,
+                    'fiscal_e_premissa' => $ehPremissa,
+                    'data_lancamento' => now(),
                 ]);
 
                 // SCHEMA-CONTRATO-INTELIGENCIA-MERCADO.md §5 — a correção é sua
@@ -326,6 +350,13 @@ class VendaService
      * VERTICAL-VENDA.md §3b — Configuração Fiscal mínima. A taxa segue como
      * PREMISSA (fiscal_e_premissa=true) até o produtor declarar a regra real
      * (§10) — nunca apresentada como fato numa UI antes disso.
+     *
+     * SCHEMA-CONTRATO-CONFIGURACAO-FISCAL.md §4 — passa a devolver a taxa
+     * aplicada (3º valor), já calculada internamente, pra LancamentoFiscal
+     * poder congelá-la (INV-062). INV-063: sem ResponsavelFiscal, dedução
+     * zero explícita, nunca um erro.
+     *
+     * @return array{0: float, 1: bool, 2: ?float}
      */
     private function calcularDeducaoFiscal(int $fazendaId, float $valorBruto): array
     {
@@ -334,7 +365,7 @@ class VendaService
         $ehPremissa = $responsavel ? (bool) $responsavel->taxa_e_premissa : true;
         $deducao = $taxa !== null ? round($valorBruto * (float) $taxa, 2) : 0.0;
 
-        return [$deducao, $ehPremissa];
+        return [$deducao, $ehPremissa, $taxa !== null ? (float) $taxa : null];
     }
 
     // VERTICAL-FORMA-PAGAMENTO.md §3 — mesmo padrão de CompraService/CompraInsumoService.
