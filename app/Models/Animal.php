@@ -26,6 +26,13 @@ class Animal extends Model
     // reproduziria exatamente o ponto cego que o Princípio 4b existe pra
     // evitar). Risco residual do mesmo tipo de INV-026: DB::table('animais')
     // ->insert()/->update() cru ainda contorna isto.
+    //
+    // SCHEMA-CONTRATO-TRANSFERENCIA-FAZENDA.md §3 / INV-052 — diferente de
+    // 'vendido'/'morto' (sem guard de model, reabertos de propósito por
+    // VendaService::corrigir()), 'transferido' não tem nenhum mecanismo de
+    // correção nesta rodada — por isso o guard de terminalidade aqui é real,
+    // mesmo idioma já usado em Gta/SeparacaoVenda/Negociacao/OrdemFrete,
+    // aplicado a Animal pela primeira vez.
     protected static function booted(): void
     {
         $regra = function (self $animal) {
@@ -40,6 +47,14 @@ class Animal extends Model
 
         static::creating($regra);
         static::updating($regra);
+
+        static::updating(function (self $animal) {
+            if ($animal->getOriginal('status') === 'transferido') {
+                throw new LogicException(
+                    "Animal com status original 'transferido' é terminal — nenhuma alteração é permitida."
+                );
+            }
+        });
     }
 
     public function fazenda(): BelongsTo

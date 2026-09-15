@@ -35,4 +35,14 @@ class Fazenda extends Model
     {
         return $this->hasMany(Venda::class);
     }
+
+    public function transferenciasEnviadas(): HasMany
+    {
+        return $this->hasMany(TransferenciaFazenda::class, 'fazenda_origem_id');
+    }
+
+    public function transferenciasRecebidas(): HasMany
+    {
+        return $this->hasMany(TransferenciaFazenda::class, 'fazenda_destino_id');
+    }
 }
