@@ -26,6 +26,11 @@ use Throwable;
  * evento: uma falha marca só aquele evento `falhou_reprocessar` (coluna já
  * prevista desde o início, nunca exercida até agora), nunca aborta o lote
  * inteiro — os outros eventos pendentes continuam sendo processados.
+ *
+ * SCHEMA-CONTRATO-SUPORTE-SUGESTOES-ADMIN.md §4 — 1º consumidor fora do
+ * eixo financeiro (`sugestao_criada`/`sugestao_respondida`/
+ * `conversa_suporte_aberta`/`conversa_suporte_respondida` → Notificação),
+ * primeira implementação real de `INV-015`.
  */
 class OutboxService
 {
@@ -44,6 +49,10 @@ class OutboxService
         try {
             match ($evento->tipo) {
                 'forma_pagamento_liquidada' => app(LancamentoService::class)->processarLiquidacao($evento),
+                'sugestao_criada' => app(NotificacaoService::class)->processarSugestaoCriada($evento),
+                'sugestao_respondida' => app(NotificacaoService::class)->processarSugestaoRespondida($evento),
+                'conversa_suporte_aberta' => app(NotificacaoService::class)->processarConversaSuporteAberta($evento),
+                'conversa_suporte_respondida' => app(NotificacaoService::class)->processarConversaSuporteRespondida($evento),
                 default => null,
             };
 
