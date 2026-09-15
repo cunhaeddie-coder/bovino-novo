@@ -92,19 +92,43 @@ class TransferenciaFazendaService
                     ->lockForUpdate()
                     ->get();
 
-                if ($animaisOrigem->count() !== count($animalIds)) {
-                    throw new DomainException('Um ou mais animais não pertencem à Fazenda de origem informada.');
-                }
+                $elegivel = $animaisOrigem->count() === count($animalIds)
+                    && $animaisOrigem->every(fn (Animal $a) => $a->status === 'ativo' && $a->lote_id === null);
 
-                // INV-051 — Animal de Lote fica fora do corte mínimo (custo
-                // agregado não sabe ser dividido). Tudo ou nada: um único
-                // animal inválido recusa a transferência inteira.
-                foreach ($animaisOrigem as $animal) {
-                    if ($animal->status !== 'ativo') {
-                        throw new DomainException("Animal #{$animal->id} não está ativo na Fazenda de origem (status atual: {$animal->status}).");
+                if (! $elegivel) {
+                    // Achado real, confirmado contra MySQL (Spike 007,
+                    // extensão Vertical 26, Ataque Z) — mesma classe de bug
+                    // já encontrada e corrigida em VendaService::registrar():
+                    // uma transação CONCORRENTE com a MESMA
+                    // chave_idempotencia pode ter transferido esses animais
+                    // primeiro. Isso não é pedido inválido, é reenvio que
+                    // perdeu a corrida pelo lock — sem esta checagem, o
+                    // reenvio é rejeitado com uma DomainException crua em
+                    // vez de reconhecido (SQLite nunca provou isso, porque
+                    // lockForUpdate() é um no-op nesse driver).
+                    $concorrente = TransferenciaFazenda::where('fazenda_origem_id', $fazendaOrigemId)
+                        ->where('chave_idempotencia', $chaveIdempotencia)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($concorrente) {
+                        return ['reenvio_detectado' => true, 'transferencia' => $concorrente];
                     }
-                    if ($animal->lote_id !== null) {
-                        throw new DomainException("Animal #{$animal->id} pertence a um Lote — transferência de Lote fora do corte mínimo.");
+
+                    if ($animaisOrigem->count() !== count($animalIds)) {
+                        throw new DomainException('Um ou mais animais não pertencem à Fazenda de origem informada.');
+                    }
+
+                    // INV-051 — Animal de Lote fica fora do corte mínimo
+                    // (custo agregado não sabe ser dividido). Tudo ou nada:
+                    // um único animal inválido recusa a transferência
+                    // inteira.
+                    foreach ($animaisOrigem as $animal) {
+                        if ($animal->status !== 'ativo') {
+                            throw new DomainException("Animal #{$animal->id} não está ativo na Fazenda de origem (status atual: {$animal->status}).");
+                        }
+                        if ($animal->lote_id !== null) {
+                            throw new DomainException("Animal #{$animal->id} pertence a um Lote — transferência de Lote fora do corte mínimo.");
+                        }
                     }
                 }
 

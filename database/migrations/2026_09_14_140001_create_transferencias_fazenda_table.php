@@ -21,7 +21,13 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['fazenda_origem_id', 'id']);
-            $table->unique(['fazenda_origem_id', 'chave_idempotencia']);
+            // Nome explícito e curto: o nome padrão do Laravel pra este par
+            // de colunas passa de 64 caracteres (limite de identificador do
+            // MySQL, SQLSTATE 42000/1059) — nunca detectado pela suíte de
+            // testes porque roda em SQLite, que não impõe esse limite
+            // (achado real, Spike 007 extensão Vertical 26, contra MySQL
+            // real).
+            $table->unique(['fazenda_origem_id', 'chave_idempotencia'], 'transferencias_fazenda_origem_chave_unique');
         });
     }
 
