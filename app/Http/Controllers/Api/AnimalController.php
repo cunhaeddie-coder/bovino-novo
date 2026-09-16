@@ -20,6 +20,11 @@ class AnimalController extends Controller
         $dados = $request->validate([
             'fazenda_id' => ['required', 'integer'],
             'status' => ['nullable', 'string'],
+            'categoria' => ['nullable', 'string'],
+            'finalidade' => ['nullable', 'string'],
+            'raca' => ['nullable', 'string'],
+            'tipo_origem' => ['nullable', 'string'],
+            'lote_id' => ['nullable', 'integer'],
         ]);
 
         $usuario = Usuario::findOrFail($request->user()->id);
@@ -30,6 +35,21 @@ class AnimalController extends Controller
         $query = Animal::where('fazenda_id', $dados['fazenda_id']);
         if (! empty($dados['status'])) {
             $query->where('status', $dados['status']);
+        }
+        if (! empty($dados['categoria'])) {
+            $query->where('categoria', 'like', '%'.$dados['categoria'].'%');
+        }
+        if (! empty($dados['finalidade'])) {
+            $query->where('finalidade', 'like', '%'.$dados['finalidade'].'%');
+        }
+        if (! empty($dados['raca'])) {
+            $query->where('raca', 'like', '%'.$dados['raca'].'%');
+        }
+        if (! empty($dados['tipo_origem'])) {
+            $query->where('tipo_origem', $dados['tipo_origem']);
+        }
+        if (array_key_exists('lote_id', $dados) && $dados['lote_id'] !== null) {
+            $query->where('lote_id', $dados['lote_id']);
         }
 
         return response()->json(['animais' => $query->orderBy('id')->get()]);

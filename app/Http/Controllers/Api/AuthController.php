@@ -38,7 +38,7 @@ class AuthController extends Controller
         $resultado = $this->auth->login($dados['identificador'], $dados['senha']);
 
         return response()->json([
-            'usuario' => $resultado['usuario'],
+            'usuario' => $resultado['usuario']->load('papeis.fazenda'),
             'token' => $resultado['token'],
         ]);
     }

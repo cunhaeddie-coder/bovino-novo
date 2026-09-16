@@ -6,6 +6,7 @@ use App\Models\Animal;
 use App\Models\Fazenda;
 use App\Models\Fornecedor;
 use App\Models\Insumo;
+use App\Models\Lote;
 use App\Models\Papel;
 use App\Services\AuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,6 +59,29 @@ class LeituraApoioHttpTest extends TestCase
         $this->auth()->getJson("/api/animais?fazenda_id={$outraFazenda}")->assertStatus(422);
     }
 
+    public function test_filtrar_animais_por_categoria_finalidade_raca_e_origem_via_http(): void
+    {
+        Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => null, 'custo_aquisicao' => 4200, 'status' => 'ativo', 'categoria' => 'vaca', 'finalidade' => 'cria', 'raca' => 'Angus', 'tipo_origem' => 'comprado']);
+        Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => null, 'custo_aquisicao' => 8500, 'status' => 'ativo', 'categoria' => 'touro', 'finalidade' => 'reproducao', 'raca' => 'Nelore', 'tipo_origem' => 'comprado']);
+
+        $resposta = $this->auth()->getJson("/api/animais?fazenda_id={$this->fazenda}&raca=Angus");
+        $resposta->assertStatus(200);
+        $this->assertCount(1, $resposta->json('animais'));
+        $this->assertSame('vaca', $resposta->json('animais.0.categoria'));
+    }
+
+    public function test_filtrar_animais_por_lote_via_http(): void
+    {
+        $lote = Lote::create(['fazenda_id' => $this->fazenda, 'qtd_animais' => 2, 'custo_aquisicao' => 6000]);
+        Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => $lote->id, 'custo_aquisicao' => null, 'status' => 'ativo']);
+        Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => null, 'custo_aquisicao' => 3000, 'status' => 'ativo']);
+
+        $resposta = $this->auth()->getJson("/api/animais?fazenda_id={$this->fazenda}&lote_id={$lote->id}");
+
+        $resposta->assertStatus(200);
+        $this->assertCount(1, $resposta->json('animais'));
+    }
+
     public function test_listar_fornecedores_via_http(): void
     {
         Fornecedor::create(['nome' => 'Fazenda Marília']);
@@ -76,6 +100,24 @@ class LeituraApoioHttpTest extends TestCase
 
         $resposta->assertStatus(200);
         $this->assertCount(1, $resposta->json('insumos'));
+    }
+
+    public function test_listar_lotes_com_custo_medio_calculado_via_http(): void
+    {
+        Lote::create(['fazenda_id' => $this->fazenda, 'qtd_animais' => 4, 'custo_aquisicao' => 18400]);
+
+        $resposta = $this->auth()->getJson("/api/lotes?fazenda_id={$this->fazenda}");
+
+        $resposta->assertStatus(200);
+        $this->assertCount(1, $resposta->json('lotes'));
+        $this->assertEquals(4600, $resposta->json('lotes.0.custo_medio'));
+    }
+
+    public function test_listar_lotes_de_outra_fazenda_e_recusado(): void
+    {
+        $outraFazenda = Fazenda::create(['nome' => 'Outra Fazenda'])->id;
+
+        $this->auth()->getJson("/api/lotes?fazenda_id={$outraFazenda}")->assertStatus(422);
     }
 
     public function test_leitura_de_apoio_sem_token_retorna_401(): void
