@@ -43,6 +43,27 @@ class AutenticacaoHttpTest extends TestCase
         $resposta->assertJsonStructure(['usuario', 'token']);
     }
 
+    /**
+     * Achado real ao integrar o frontend: o front precisa saber a Fazenda
+     * do usuário logo após o login (pra escopar toda chamada seguinte),
+     * sem um 2º round-trip a /api/auth/eu. login() ficava inconsistente
+     * com eu() (que já carrega papeis.fazenda) — corrigido pra carregar
+     * igual nos dois.
+     */
+    public function test_login_via_http_ja_retorna_papeis_da_fazenda(): void
+    {
+        $usuario = app(AuthService::class)->registrar('José', 'jose@fazenda.com', null, 'senha123');
+        $fazenda = Fazenda::create(['nome' => 'Fazenda Alegria']);
+        Papel::create(['usuario_id' => $usuario->id, 'fazenda_id' => $fazenda->id, 'papel' => 'dono']);
+
+        $resposta = $this->postJson('/api/auth/login', [
+            'identificador' => 'jose@fazenda.com', 'senha' => 'senha123',
+        ]);
+
+        $resposta->assertStatus(200);
+        $resposta->assertJsonPath('usuario.papeis.0.fazenda.nome', 'Fazenda Alegria');
+    }
+
     public function test_login_com_senha_errada_via_http_retorna_422(): void
     {
         app(AuthService::class)->registrar('José', 'jose@fazenda.com', null, 'senha123');

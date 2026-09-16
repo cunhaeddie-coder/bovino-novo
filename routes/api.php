@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CompraInsumoController;
 use App\Http\Controllers\Api\FormaPagamentoController;
 use App\Http\Controllers\Api\FornecedorController;
 use App\Http\Controllers\Api\InsumoController;
+use App\Http\Controllers\Api\LoteController;
 use App\Http\Controllers\Api\VendaController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +26,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/animais', [AnimalController::class, 'index']);
     Route::get('/fornecedores', [FornecedorController::class, 'index']);
     Route::get('/insumos', [InsumoController::class, 'index']);
+
+    // Módulo Rebanho (wireframe "Navegação Completa" aprovado 16/09/2026)
+    // — mesma disciplina de thin wrapper, leitura de apoio nunca escreve.
+    Route::get('/lotes', [LoteController::class, 'index']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
