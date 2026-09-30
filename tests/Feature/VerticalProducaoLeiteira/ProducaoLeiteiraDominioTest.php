@@ -8,6 +8,7 @@ use App\Models\Fazenda;
 use App\Models\Papel;
 use App\Models\Usuario;
 use App\Services\ProducaoLeiteiraService;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -78,5 +79,19 @@ class ProducaoLeiteiraDominioTest extends TestCase
 
         $this->assertTrue($segundo['reenvio_detectado']);
         $this->assertSame($primeiro['producao']->id, $segundo['producao']->id);
+    }
+
+    /**
+     * Achado real ao expor via HTTP (30/09/2026): nenhum teste de domínio
+     * jamais exercitou este caminho — INV-039 só existia no guard do Model
+     * (LogicException crua), nunca pré-validada no Service. Corrigido pra
+     * DomainException limpa, mesmo padrão de toda outra checagem aqui.
+     */
+    public function test_soma_vendida_mais_bezerro_excedendo_total_e_recusada_com_domain_exception(): void
+    {
+        $this->expectException(DomainException::class);
+        $this->expectExceptionMessage('INV-039');
+
+        $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 7.0, 5.0, 'producao-excede');
     }
 }
