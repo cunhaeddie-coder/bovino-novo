@@ -4,12 +4,15 @@ use App\Http\Controllers\Api\AnimalController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompraController;
 use App\Http\Controllers\Api\CompraInsumoController;
+use App\Http\Controllers\Api\ConfirmacaoPrenhezController;
 use App\Http\Controllers\Api\EventoSaudeController;
 use App\Http\Controllers\Api\FormaPagamentoController;
 use App\Http\Controllers\Api\FornecedorController;
 use App\Http\Controllers\Api\GtaController;
 use App\Http\Controllers\Api\InsumoController;
 use App\Http\Controllers\Api\LoteController;
+use App\Http\Controllers\Api\MarcacaoCioController;
+use App\Http\Controllers\Api\ProtocoloReprodutivoController;
 use App\Http\Controllers\Api\VendaController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +42,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/eventos-saude', [EventoSaudeController::class, 'index']);
     Route::post('/eventos-saude', [EventoSaudeController::class, 'store']);
+
+    Route::get('/protocolos-reprodutivos', [ProtocoloReprodutivoController::class, 'index']);
+    Route::post('/protocolos-reprodutivos', [ProtocoloReprodutivoController::class, 'store']);
+    Route::post('/protocolos-reprodutivos/{protocolo}/etapas', [ProtocoloReprodutivoController::class, 'cumprirEtapa']);
+
+    Route::get('/marcacoes-cio', [MarcacaoCioController::class, 'index']);
+    Route::post('/marcacoes-cio', [MarcacaoCioController::class, 'store']);
+
+    Route::get('/confirmacoes-prenhez', [ConfirmacaoPrenhezController::class, 'index']);
+    Route::post('/confirmacoes-prenhez', [ConfirmacaoPrenhezController::class, 'store']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
