@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AnimalController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompraController;
 use App\Http\Controllers\Api\CompraInsumoController;
+use App\Http\Controllers\Api\EventoSaudeController;
 use App\Http\Controllers\Api\FormaPagamentoController;
 use App\Http\Controllers\Api\FornecedorController;
 use App\Http\Controllers\Api\GtaController;
@@ -35,6 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/gtas', [GtaController::class, 'index']);
     Route::post('/gtas', [GtaController::class, 'store']);
     Route::post('/gtas/{gta}/concluir', [GtaController::class, 'concluir']);
+
+    Route::get('/eventos-saude', [EventoSaudeController::class, 'index']);
+    Route::post('/eventos-saude', [EventoSaudeController::class, 'store']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
