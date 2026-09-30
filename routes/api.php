@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CompraController;
 use App\Http\Controllers\Api\CompraInsumoController;
 use App\Http\Controllers\Api\FormaPagamentoController;
 use App\Http\Controllers\Api\FornecedorController;
+use App\Http\Controllers\Api\GtaController;
 use App\Http\Controllers\Api\InsumoController;
 use App\Http\Controllers\Api\LoteController;
 use App\Http\Controllers\Api\VendaController;
@@ -30,6 +31,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Módulo Rebanho (wireframe "Navegação Completa" aprovado 16/09/2026)
     // — mesma disciplina de thin wrapper, leitura de apoio nunca escreve.
     Route::get('/lotes', [LoteController::class, 'index']);
+
+    Route::get('/gtas', [GtaController::class, 'index']);
+    Route::post('/gtas', [GtaController::class, 'store']);
+    Route::post('/gtas/{gta}/concluir', [GtaController::class, 'concluir']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
