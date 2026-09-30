@@ -58,6 +58,17 @@ class ProducaoLeiteiraService
             throw new DomainException('quantidade_vendida e quantidade_bezerro não podem ser negativas.');
         }
 
+        // Achado real ao expor via HTTP (30/09/2026): esta soma só era
+        // validada pelo guard do Model (INV-039), que lança LogicException
+        // crua — não capturada pelo handler de DomainException em
+        // bootstrap/app.php, virava 500 em vez de 422. Mesma disciplina de
+        // toda checagem de domínio no Service: falhar limpo antes da
+        // transação, nunca deixar o guard de infraestrutura ser a única
+        // defesa.
+        if (round($quantidadeVendida + $quantidadeBezerro, 2) > round($quantidadeTotal, 2)) {
+            throw new DomainException('quantidade_vendida + quantidade_bezerro não pode exceder quantidade_total (INV-039).');
+        }
+
         try {
             $producao = ProducaoLeiteira::create([
                 'fazenda_id' => $fazendaId,

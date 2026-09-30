@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\GtaController;
 use App\Http\Controllers\Api\InsumoController;
 use App\Http\Controllers\Api\LoteController;
 use App\Http\Controllers\Api\MarcacaoCioController;
+use App\Http\Controllers\Api\ProducaoLeiteiraController;
 use App\Http\Controllers\Api\ProtocoloReprodutivoController;
 use App\Http\Controllers\Api\VendaController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +53,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/confirmacoes-prenhez', [ConfirmacaoPrenhezController::class, 'index']);
     Route::post('/confirmacoes-prenhez', [ConfirmacaoPrenhezController::class, 'store']);
+
+    Route::get('/producoes-leiteiras', [ProducaoLeiteiraController::class, 'index']);
+    Route::post('/producoes-leiteiras', [ProducaoLeiteiraController::class, 'store']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
