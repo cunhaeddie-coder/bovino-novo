@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\IncendioController;
 use App\Http\Controllers\Api\InsumoController;
 use App\Http\Controllers\Api\LoteController;
 use App\Http\Controllers\Api\MarcacaoCioController;
+use App\Http\Controllers\Api\MotoristaController;
+use App\Http\Controllers\Api\OrdemFreteController;
 use App\Http\Controllers\Api\PiqueteController;
 use App\Http\Controllers\Api\ProducaoLeiteiraController;
 use App\Http\Controllers\Api\ProtocoloReprodutivoController;
@@ -67,6 +69,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/incendios', [IncendioController::class, 'index']);
     Route::post('/incendios', [IncendioController::class, 'store']);
+
+    Route::get('/motoristas', [MotoristaController::class, 'index']);
+
+    Route::get('/ordens-frete', [OrdemFreteController::class, 'index']);
+    Route::post('/ordens-frete', [OrdemFreteController::class, 'solicitar']);
+    Route::post('/ordens-frete/contratar-direto', [OrdemFreteController::class, 'contratarDireto']);
+    Route::post('/ordens-frete/{ordemFrete}/aceitar-proposta', [OrdemFreteController::class, 'aceitarProposta']);
+    Route::post('/ordens-frete/{ordemFrete}/cancelar', [OrdemFreteController::class, 'cancelar']);
+    Route::post('/ordens-frete/{ordemFrete}/concluir', [OrdemFreteController::class, 'concluir']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
