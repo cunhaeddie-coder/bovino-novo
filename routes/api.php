@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\FuncionarioController;
 use App\Http\Controllers\Api\GtaController;
 use App\Http\Controllers\Api\IncendioController;
 use App\Http\Controllers\Api\InsumoController;
+use App\Http\Controllers\Api\IntelligenciaMercadoController;
 use App\Http\Controllers\Api\LoteController;
 use App\Http\Controllers\Api\MarcacaoCioController;
 use App\Http\Controllers\Api\MotoristaController;
@@ -103,6 +104,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/negociacoes/{negociacao}/aceitar', [NegociacaoController::class, 'aceitar']);
     Route::post('/negociacoes/{negociacao}/confirmar-vendedor', [NegociacaoController::class, 'confirmarVendedor']);
     Route::post('/negociacoes/{negociacao}/confirmar-comprador', [NegociacaoController::class, 'confirmarComprador']);
+
+    Route::get('/inteligencia-mercado/cotacoes', [IntelligenciaMercadoController::class, 'cotacoes']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
