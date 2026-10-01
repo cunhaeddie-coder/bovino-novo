@@ -7,8 +7,10 @@ use App\Http\Controllers\Api\CompraController;
 use App\Http\Controllers\Api\CompraInsumoController;
 use App\Http\Controllers\Api\ConfirmacaoPrenhezController;
 use App\Http\Controllers\Api\EventoSaudeController;
+use App\Http\Controllers\Api\FolhaPagamentoController;
 use App\Http\Controllers\Api\FormaPagamentoController;
 use App\Http\Controllers\Api\FornecedorController;
+use App\Http\Controllers\Api\FuncionarioController;
 use App\Http\Controllers\Api\GtaController;
 use App\Http\Controllers\Api\IncendioController;
 use App\Http\Controllers\Api\InsumoController;
@@ -83,6 +85,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/arrendamentos', [ArrendamentoController::class, 'index']);
     Route::post('/arrendamentos', [ArrendamentoController::class, 'store']);
     Route::post('/arrendamentos/{arrendamento}/gerar-parcela', [ArrendamentoController::class, 'gerarProximaParcela']);
+
+    Route::get('/funcionarios', [FuncionarioController::class, 'index']);
+    Route::post('/funcionarios', [FuncionarioController::class, 'store']);
+    Route::post('/funcionarios/{funcionario}/desligar', [FuncionarioController::class, 'desligar']);
+    Route::post('/funcionarios/{funcionario}/acerto-rescisao', [FuncionarioController::class, 'registrarAcertoRescisao']);
+
+    Route::post('/folha-pagamento/gerar-mes', [FolhaPagamentoController::class, 'gerarMes']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
