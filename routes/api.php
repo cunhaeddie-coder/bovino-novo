@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AnimalController;
+use App\Http\Controllers\Api\AnuncioController;
 use App\Http\Controllers\Api\ArrendamentoController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompraController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Api\InsumoController;
 use App\Http\Controllers\Api\LoteController;
 use App\Http\Controllers\Api\MarcacaoCioController;
 use App\Http\Controllers\Api\MotoristaController;
+use App\Http\Controllers\Api\NegociacaoController;
 use App\Http\Controllers\Api\OrdemFreteController;
 use App\Http\Controllers\Api\PiqueteController;
 use App\Http\Controllers\Api\ProducaoLeiteiraController;
@@ -92,6 +94,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/funcionarios/{funcionario}/acerto-rescisao', [FuncionarioController::class, 'registrarAcertoRescisao']);
 
     Route::post('/folha-pagamento/gerar-mes', [FolhaPagamentoController::class, 'gerarMes']);
+
+    Route::get('/anuncios', [AnuncioController::class, 'index']);
+    Route::post('/anuncios', [AnuncioController::class, 'store']);
+
+    Route::get('/negociacoes', [NegociacaoController::class, 'index']);
+    Route::post('/negociacoes', [NegociacaoController::class, 'store']);
+    Route::post('/negociacoes/{negociacao}/aceitar', [NegociacaoController::class, 'aceitar']);
+    Route::post('/negociacoes/{negociacao}/confirmar-vendedor', [NegociacaoController::class, 'confirmarVendedor']);
+    Route::post('/negociacoes/{negociacao}/confirmar-comprador', [NegociacaoController::class, 'confirmarComprador']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
