@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AnimalController;
+use App\Http\Controllers\Api\ArrendamentoController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CompraController;
 use App\Http\Controllers\Api\CompraInsumoController;
@@ -78,6 +79,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/ordens-frete/{ordemFrete}/aceitar-proposta', [OrdemFreteController::class, 'aceitarProposta']);
     Route::post('/ordens-frete/{ordemFrete}/cancelar', [OrdemFreteController::class, 'cancelar']);
     Route::post('/ordens-frete/{ordemFrete}/concluir', [OrdemFreteController::class, 'concluir']);
+
+    Route::get('/arrendamentos', [ArrendamentoController::class, 'index']);
+    Route::post('/arrendamentos', [ArrendamentoController::class, 'store']);
+    Route::post('/arrendamentos/{arrendamento}/gerar-parcela', [ArrendamentoController::class, 'gerarProximaParcela']);
 
     Route::get('/vendas', [VendaController::class, 'index']);
     Route::post('/vendas', [VendaController::class, 'store']);
