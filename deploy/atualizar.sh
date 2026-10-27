@@ -39,7 +39,8 @@ echo "== trocando a API pra $SHA"
 ln -sfn "$REL" "$BASE/current"
 echo "$SHA" > "$BASE/deployed.txt"
 
-code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -H "Host: homolog.bovino.agr.br" http://127.0.0.1/up || echo 000)
+# Pelo próprio servidor, mas em HTTPS: desde o certificado (27/10/2026) a porta 80 só redireciona (301).
+code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 --resolve homolog.bovino.agr.br:443:127.0.0.1 https://homolog.bovino.agr.br/up || echo 000)
 [ "$code" = "200" ] && echo "== no ar: $SHA" || echo "AVISO: /up respondeu $code depois da troca (anterior: ls $BASE/releases)"
 
 # Mantém as 3 últimas versões pra voltar rápido: ln -sfn releases/<anterior> current.
