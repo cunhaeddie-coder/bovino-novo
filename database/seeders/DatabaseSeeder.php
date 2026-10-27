@@ -2,24 +2,16 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+// Sem dado semeado de propósito. O seeder gerado pelo Laravel usava
+// App\Models\User, removido no Vertical 33 (Usuario virou o Authenticatable),
+// e `db:seed` quebrava. A homologação começa vazia: o usuário se cadastra em
+// POST /api/auth/registrar e a Fazenda vem de `php artisan fazenda:criar`.
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        //
     }
 }
