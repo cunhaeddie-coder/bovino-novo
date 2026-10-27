@@ -4,12 +4,12 @@ namespace App\Services;
 
 use App\Models\CompraInsumo;
 use App\Models\CompraInsumoItem;
-use App\Models\EventoDominio;
 use App\Models\FormaPagamento;
 use App\Models\Fornecedor;
 use App\Models\Insumo;
 use App\Models\ObrigacaoFinanceira;
 use App\Models\Usuario;
+use App\Services\Concerns\RegistraEventoDominio;
 use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +25,8 @@ use Illuminate\Support\Facades\DB;
  */
 class CompraInsumoService
 {
+    use RegistraEventoDominio;
+
     public function buscar(int $usuarioId, int $compraInsumoId): ?CompraInsumo
     {
         $compra = CompraInsumo::find($compraInsumoId);
@@ -298,17 +300,6 @@ class CompraInsumoService
         ]);
 
         return $forma;
-    }
-
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 
     private function violacaoDeUnicidade(QueryException $e): bool

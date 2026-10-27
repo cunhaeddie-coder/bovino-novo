@@ -68,6 +68,11 @@ class FolhaPagamentoDominioTest extends TestCase
 
         $evento = EventoDominio::where('fazenda_id', $this->fazenda)->where('tipo', 'folha_pagamento_gerada')->first();
         $this->assertNotNull($evento);
+        // registrarEvento() virou o trait RegistraEventoDominio (27/10/2026). A Folha era a única
+        // cópia que não acrescentava ":evento" (a chamada já mandava com o sufixo): a chave gravada
+        // continua exatamente a mesma de antes.
+        $this->assertSame("folha:{$folha->funcionario_id}:2026-01:evento", $evento->chave_idempotencia);
+        $this->assertSame('pendente', $evento->status_consequencia);
     }
 
     /** A folha pendente é paga reaproveitando FormaPagamentoService::liquidar() já existente, sem alteração. */

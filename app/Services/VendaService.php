@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Animal;
-use App\Models\EventoDominio;
 use App\Models\FormaPagamento;
 use App\Models\LancamentoFiscal;
 use App\Models\Lote;
@@ -11,6 +10,7 @@ use App\Models\ObrigacaoFinanceira;
 use App\Models\ResponsavelFiscal;
 use App\Models\Usuario;
 use App\Models\Venda;
+use App\Services\Concerns\RegistraEventoDominio;
 use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\DB;
  */
 class VendaService
 {
+    use RegistraEventoDominio;
+
     public function buscar(int $usuarioId, int $vendaId): ?Venda
     {
         $venda = Venda::find($vendaId);
@@ -397,17 +399,6 @@ class VendaService
         ]);
 
         return $forma;
-    }
-
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 
     private function violacaoDeUnicidade(QueryException $e): bool

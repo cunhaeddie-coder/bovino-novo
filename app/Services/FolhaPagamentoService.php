@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\EventoDominio;
 use App\Models\FolhaPagamento;
 use App\Models\FormaPagamento;
 use App\Models\Funcionario;
 use App\Models\ObrigacaoFinanceira;
 use App\Models\Usuario;
+use App\Services\Concerns\RegistraEventoDominio;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Database\QueryException;
@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\DB;
  */
 class FolhaPagamentoService
 {
+    use RegistraEventoDominio;
+
     public function gerarMes(int $usuarioId, int $fazendaId, string $mesReferencia): array
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
@@ -63,7 +65,7 @@ class FolhaPagamentoService
                         'pago_em' => null,
                     ]);
 
-                    $this->registrarEvento('folha_pagamento_gerada', $fazendaId, "folha:{$funcionario->id}:{$mesReferencia}:evento", [
+                    $this->registrarEvento('folha_pagamento_gerada', $fazendaId, "folha:{$funcionario->id}:{$mesReferencia}", [
                         'tipo' => 'folha_pagamento_gerada', 'funcionario_id' => $funcionario->id,
                         'folha_pagamento_id' => $folha->id, 'mes_referencia' => $mesReferencia,
                     ]);
@@ -91,17 +93,6 @@ class FolhaPagamentoService
         if (! $usuario->temRelacaoComFazenda($fazendaId)) {
             throw new DomainException("Operação recusada: usuário {$usuarioId} sem relação com a Fazenda {$fazendaId}.");
         }
-    }
-
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato,
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 
     private function violacaoDeUnicidade(QueryException $e): bool

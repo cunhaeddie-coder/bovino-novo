@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\ConversaSuporte;
-use App\Models\EventoDominio;
 use App\Models\Usuario;
+use App\Services\Concerns\RegistraEventoDominio;
 use DomainException;
 use Illuminate\Database\QueryException;
 
@@ -15,6 +15,8 @@ use Illuminate\Database\QueryException;
  */
 class ConversaSuporteService
 {
+    use RegistraEventoDominio;
+
     public function buscar(int $usuarioId, int $conversaId): ?ConversaSuporte
     {
         $conversa = ConversaSuporte::find($conversaId);
@@ -108,17 +110,6 @@ class ConversaSuporteService
         if (! $usuario->eh_administrador) {
             throw new DomainException("Operação recusada: usuário {$usuarioId} não é administrador.");
         }
-    }
-
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 
     private function violacaoDeUnicidade(QueryException $e): bool

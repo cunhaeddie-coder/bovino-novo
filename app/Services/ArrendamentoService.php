@@ -3,12 +3,12 @@
 namespace App\Services;
 
 use App\Models\Arrendamento;
-use App\Models\EventoDominio;
 use App\Models\FormaPagamento;
 use App\Models\Fornecedor;
 use App\Models\ObrigacaoFinanceira;
 use App\Models\ParcelaArrendamento;
 use App\Models\Usuario;
+use App\Services\Concerns\RegistraEventoDominio;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Database\QueryException;
@@ -33,6 +33,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ArrendamentoService
 {
+    use RegistraEventoDominio;
+
     public function buscar(int $usuarioId, int $arrendamentoId): ?Arrendamento
     {
         $arrendamento = Arrendamento::find($arrendamentoId);
@@ -181,17 +183,6 @@ class ArrendamentoService
         if (! $usuario->temRelacaoComFazenda($fazendaId)) {
             throw new DomainException("Operação recusada: usuário {$usuarioId} sem relação com a Fazenda {$fazendaId}.");
         }
-    }
-
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 
     private function violacaoDeUnicidade(QueryException $e): bool
