@@ -3,12 +3,12 @@
 namespace App\Services;
 
 use App\Models\Anuncio;
-use App\Models\EventoDominio;
 use App\Models\Fazenda;
 use App\Models\Fornecedor;
 use App\Models\Kyc;
 use App\Models\Negociacao;
 use App\Models\Usuario;
+use App\Services\Concerns\RegistraEventoDominio;
 use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +28,8 @@ use Illuminate\Support\Facades\DB;
  */
 class NegociacaoService
 {
+    use RegistraEventoDominio;
+
     public function buscar(int $usuarioId, int $negociacaoId): ?Negociacao
     {
         $negociacao = Negociacao::with('anuncio')->find($negociacaoId);
@@ -281,17 +283,6 @@ class NegociacaoService
         if (! $aprovado) {
             throw new DomainException("Operação recusada: Fazenda {$fazendaId} não tem KYC aprovado — não pode propor Negociação.");
         }
-    }
-
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 
     private function violacaoDeUnicidade(QueryException $e): bool

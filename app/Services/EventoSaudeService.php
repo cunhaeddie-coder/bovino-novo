@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Models\Animal;
-use App\Models\EventoDominio;
 use App\Models\EventoSaude;
 use App\Models\Usuario;
+use App\Services\Concerns\RegistraEventoDominio;
 use DomainException;
 use Illuminate\Database\QueryException;
 
@@ -45,6 +45,8 @@ use Illuminate\Database\QueryException;
  */
 class EventoSaudeService
 {
+    use RegistraEventoDominio;
+
     public function buscar(int $usuarioId, int $eventoId): ?EventoSaude
     {
         $evento = EventoSaude::find($eventoId);
@@ -139,17 +141,6 @@ class EventoSaudeService
         if (! $usuario->temRelacaoComFazenda($fazendaId)) {
             throw new DomainException("Operação recusada: usuário {$usuarioId} sem relação com a Fazenda {$fazendaId}.");
         }
-    }
-
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 
     private function violacaoDeUnicidade(QueryException $e): bool

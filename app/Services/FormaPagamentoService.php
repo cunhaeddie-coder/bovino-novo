@@ -3,10 +3,10 @@
 namespace App\Services;
 
 use App\Models\Animal;
-use App\Models\EventoDominio;
 use App\Models\FormaPagamento;
 use App\Models\FormaPagamentoHistorico;
 use App\Models\Usuario;
+use App\Services\Concerns\RegistraEventoDominio;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\DB;
  */
 class FormaPagamentoService
 {
+    use RegistraEventoDominio;
+
     /**
      * SCHEMA-CONTRATO-FORMA-PAGAMENTO.md §2/§5 — liquidação em dinheiro
      * grava pago_em direto; em espécie dispara a mesma baixa/entrada real de
@@ -171,17 +173,5 @@ class FormaPagamentoService
         if (! $usuario->temRelacaoComFazenda($fazendaId)) {
             throw new DomainException("Operação recusada: usuário {$usuarioId} sem relação com a Fazenda {$fazendaId}.");
         }
-    }
-
-    // Mesmo padrão duplicado nos 3 Services existentes (registrarEvento()).
-    private function registrarEvento(string $tipo, int $fazendaId, string $chaveIdempotenciaDoFato, array $payload): EventoDominio
-    {
-        return EventoDominio::create([
-            'tipo' => $tipo,
-            'fazenda_id' => $fazendaId,
-            'chave_idempotencia' => $chaveIdempotenciaDoFato.':evento',
-            'payload' => $payload,
-            'status_consequencia' => 'pendente',
-        ]);
     }
 }
