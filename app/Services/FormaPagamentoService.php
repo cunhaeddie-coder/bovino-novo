@@ -162,9 +162,45 @@ class FormaPagamentoService
             ]);
 
             $forma->update(array_intersect_key($novosDados, array_flip(['nome', 'valor', 'unidade', 'vencimento'])));
+            $this->completarDiferenca($forma);
 
             return $forma->fresh();
         });
+    }
+
+    /**
+     * INV-031 — decisão do produtor (27/10/2026, opção A): editar para menos
+     * nunca deixa a soma abaixo do total. A diferença vira uma Forma nova,
+     * pendente, em dinheiro, com o mesmo vencimento da editada. Com Forma em
+     * arroba ainda não liquidada, o valor em reais só existe na liquidação
+     * (pagar em arroba é aceitar a cotação do dia): aí a soma não é
+     * comparável e nenhuma diferença é criada por cotação adivinhada.
+     */
+    private function completarDiferenca(FormaPagamento $editada): void
+    {
+        $obrigacao = $editada->obrigacaoFinanceira()->firstOrFail();
+        $formas = $obrigacao->formasPagamento()->get();
+        if ($formas->contains(fn (FormaPagamento $f) => $f->unidade === 'arroba' && $f->pago_em === null)) {
+            return;
+        }
+
+        $soma = $formas->sum(fn (FormaPagamento $f) => $f->unidade === 'arroba'
+            ? (float) $f->valor_liquidado_reais
+            : (float) $f->valor);
+        $diferenca = round((float) $obrigacao->valor - $soma, 2);
+        if ($diferenca <= 0) {
+            return;
+        }
+
+        FormaPagamento::create([
+            'obrigacao_financeira_id' => $obrigacao->id,
+            'nome' => "Diferença de {$editada->nome}",
+            'unidade' => 'dinheiro',
+            'valor' => $diferenca,
+            'data' => now(),
+            'vencimento' => $editada->vencimento,
+            'pago_em' => null,
+        ]);
     }
 
     private function garantirRelacaoComFazenda(int $usuarioId, int $fazendaId): void

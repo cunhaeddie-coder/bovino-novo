@@ -95,7 +95,9 @@ class LancamentoService
                     'conta_id' => $conta->id,
                     'tipo' => $forma->obrigacaoFinanceira->direcao === 'a_receber' ? 'entrada' : 'saida',
                     'valor' => $forma->valor_liquidado_reais,
-                    'data_lancamento' => now(),
+                    // INV-008 — o dia em que o dinheiro entrou ou saiu, nunca o
+                    // dia em que a varredura processou o evento.
+                    'data_lancamento' => $forma->pago_em,
                     'descricao' => $this->descricaoParaObrigacao($forma->obrigacaoFinanceira),
                     'origem' => 'automatico',
                     'forma_pagamento_id' => $forma->id,

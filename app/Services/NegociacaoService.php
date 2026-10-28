@@ -58,11 +58,12 @@ class NegociacaoService
         }
 
         // SCHEMA-CONTRATO-MARKETPLACE.md §5 (INV-023) — a checagem correta é
-        // contra o status real do Anúncio, sempre vivo (nunca um campo que o
-        // produtor precisa lembrar de atualizar).
-        $anuncio = Anuncio::where('id', $anuncioId)->where('status', 'ativo')->first();
+        // contra o estado real, sempre vivo: o status do Anúncio E o dos
+        // animais dele (um animal vendido por outro canal tira o Anúncio do
+        // mercado — conferência das invariantes, 27/10/2026).
+        $anuncio = Anuncio::disponiveis()->where('id', $anuncioId)->first();
         if (! $anuncio) {
-            throw new DomainException("Anúncio #{$anuncioId} não encontrado ou não está ativo.");
+            throw new DomainException("Anúncio #{$anuncioId} não encontrado ou não está mais disponível.");
         }
 
         if ($precoProposto <= 0) {
