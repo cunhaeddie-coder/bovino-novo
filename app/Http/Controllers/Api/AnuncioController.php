@@ -32,12 +32,13 @@ class AnuncioController extends Controller
             $anuncios = Anuncio::where('fazenda_id', $dados['fazenda_id'])
                 ->with('animais')
                 ->orderByDesc('id')
-                ->get();
+                ->get()
+                ->append('situacao');
 
             return response()->json(['anuncios' => $anuncios]);
         }
 
-        $anuncios = Anuncio::where('status', 'ativo')
+        $anuncios = Anuncio::disponiveis()
             ->with('fazenda', 'animais')
             ->orderByDesc('id')
             ->get();

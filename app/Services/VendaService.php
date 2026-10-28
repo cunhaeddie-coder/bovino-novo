@@ -11,6 +11,7 @@ use App\Models\ResponsavelFiscal;
 use App\Models\Usuario;
 use App\Models\Venda;
 use App\Services\Concerns\RegistraEventoDominio;
+use Carbon\Carbon;
 use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -59,6 +60,13 @@ class VendaService
             throw new DomainException('chave_idempotencia não pode ser vazia.');
         }
 
+        // INV-002 — venda sem valor não tem consequência financeira real
+        // (conferência das invariantes, 27/10/2026). GTA, Separação e
+        // Marketplace já recusavam na entrada; a venda direta não.
+        if ($valorBruto <= 0) {
+            throw new DomainException("Venda exige valor maior que zero (recebido: {$valorBruto}).");
+        }
+
         // chave_idempotencia é escopada por Fazenda (revisão adversarial,
         // 26/08/2026) — uma colisão de chave com OUTRA Fazenda nunca pode
         // devolver a Venda de outra Fazenda (isso seria vazamento via INV-029).
@@ -95,7 +103,11 @@ class VendaService
                     );
                 }
 
-                $animais->each(fn (Animal $a) => $a->update(['status' => 'vendido', 'data_saida' => now()->toDateString()]));
+                // INV-008 — a saída, o pagamento à vista e o lançamento fiscal
+                // ficam na data real da venda, nunca na da digitação (mesma
+                // disciplina de MorteService e CompraService).
+                $diaDaVenda = Carbon::parse($dataVenda)->toDateString();
+                $animais->each(fn (Animal $a) => $a->update(['status' => 'vendido', 'data_saida' => $diaDaVenda]));
 
                 $idsVendidos = $animais->pluck('id')->values()->all();
 
@@ -148,7 +160,7 @@ class VendaService
                     'deducao_fiscal' => $deducaoFiscal,
                     'taxa_aplicada' => $taxaAplicada,
                     'fiscal_e_premissa' => $ehPremissa,
-                    'data_lancamento' => now(),
+                    'data_lancamento' => $dataVenda,
                 ]);
 
                 // SCHEMA-CONTRATO-INTELIGENCIA-MERCADO.md §5 — pivot venda_animal,
@@ -171,7 +183,7 @@ class VendaService
                     'valor' => $valorBruto,
                 ]);
 
-                $this->criarFormaPagamentoAVista($obrigacao, $valorBruto, now()->toDateString());
+                $this->criarFormaPagamentoAVista($obrigacao, $valorBruto, $diaDaVenda);
 
                 $this->registrarEvento('venda_concluida', $fazendaId, $chaveIdempotencia, [
                     'tipo' => 'venda_concluida', 'venda_id' => $venda->id, 'fazenda_id' => $fazendaId,
@@ -221,6 +233,10 @@ class VendaService
         }
         $fazendaId = $original->fazenda_id;
         $idsOriginais = $original->animal_ids;
+
+        if ($novoValorBruto <= 0) {
+            throw new DomainException("Correção de venda exige valor maior que zero (recebido: {$novoValorBruto}).");
+        }
 
         if (array_diff($novosAnimalIds, $idsOriginais)) {
             throw new DomainException(

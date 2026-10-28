@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Animal;
 use App\Models\Anuncio;
 use App\Models\Fazenda;
 use App\Models\Kyc;
@@ -32,6 +33,15 @@ class AnuncioService
 
         if (empty($animalIds)) {
             throw new DomainException('publicar exige ao menos 1 animal.');
+        }
+
+        // INV-029/INV-023 — só animais ativos da própria Fazenda (conferência
+        // das invariantes, 27/10/2026: antes qualquer id era aceito, e a
+        // vitrine mostrava o animal de outra Fazenda).
+        $animalIds = array_values(array_unique($animalIds));
+        $validos = Animal::where('fazenda_id', $fazendaId)->whereIn('id', $animalIds)->where('status', 'ativo')->count();
+        if ($validos !== count($animalIds)) {
+            throw new DomainException('Anúncio só aceita animais ativos da própria Fazenda: um ou mais animais pedidos são de outra Fazenda ou já saíram do rebanho.');
         }
 
         return DB::transaction(function () use ($fazendaId, $precoTotal, $animalIds) {

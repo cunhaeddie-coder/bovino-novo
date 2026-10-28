@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -36,5 +38,28 @@ class Anuncio extends Model
     public function negociacoes(): HasMany
     {
         return $this->hasMany(Negociacao::class);
+    }
+
+    // INV-023 — disponível é sempre checado contra o estado atual dos
+    // animais, nunca só contra o status do próprio Anúncio: um animal que
+    // saiu do rebanho por outro canal (venda direta, GTA, Separação, morte,
+    // transferência) tira o Anúncio da vitrine (conferência, 27/10/2026).
+    public function scopeDisponiveis(Builder $query): Builder
+    {
+        return $query->where('status', 'ativo')
+            ->whereDoesntHave('animais', fn (Builder $animal) => $animal->where('status', '!=', 'ativo'));
+    }
+
+    // O que a Fazenda dona vê: 'indisponivel' quando o Anúncio segue 'ativo'
+    // mas algum animal já saiu do rebanho (INV-023).
+    protected function situacao(): Attribute
+    {
+        return Attribute::get(function () {
+            if ($this->status !== 'ativo') {
+                return $this->status;
+            }
+
+            return $this->animais->contains(fn (Animal $animal) => $animal->status !== 'ativo') ? 'indisponivel' : 'ativo';
+        });
     }
 }
