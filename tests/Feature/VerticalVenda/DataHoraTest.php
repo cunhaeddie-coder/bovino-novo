@@ -46,7 +46,13 @@ class DataHoraTest extends TestCase
         $this->assertSame('2026-03-10 14:30:00', $resultado['venda']->data_venda->format('Y-m-d H:i:s'), 'data_e_hora_declaradas_preservadas_exatas');
     }
 
-    public function test_correcao_de_venda_tem_sua_propria_data_venda_distinta_da_original(): void
+    /**
+     * Decisão V1 do produtor (28/10/2026) substitui a de 04/09: corrigir é
+     * consertar o registro de uma venda que aconteceu numa data real, então a
+     * versão corrigida mantém essa data (INV-008); o momento da correção fica
+     * em created_at.
+     */
+    public function test_correcao_de_venda_mantem_a_data_real_da_venda(): void
     {
         $fazenda = Fazenda::create(['nome' => 'A'])->id;
         $jose = Usuario::create(['nome' => 'José'])->id;
@@ -58,11 +64,7 @@ class DataHoraTest extends TestCase
         $original = $vendas->registrar($jose, $fazenda, [$a1, $a2], 1000.00, '2026-01-01 09:00:00', 'venda-original');
         $correcao = $vendas->corrigir($jose, $original['venda']->id, [$a1], 500.00, 'correcao-1');
 
-        $this->assertNotNull($correcao['correcao']->data_venda, 'correcao_tambem_tem_data_venda_preenchida');
-        $this->assertNotSame(
-            $original['venda']->data_venda->format('Y-m-d H:i:s'),
-            $correcao['correcao']->data_venda->format('Y-m-d H:i:s'),
-            'correcao_e_seu_proprio_fato_com_seu_proprio_momento_real'
-        );
+        $this->assertSame('2026-01-01 09:00:00', $correcao['correcao']->data_venda->format('Y-m-d H:i:s'), 'correcao_mantem_a_data_real_da_venda');
+        $this->assertNotNull($correcao['correcao']->created_at, 'momento_da_correcao_fica_em_created_at');
     }
 }

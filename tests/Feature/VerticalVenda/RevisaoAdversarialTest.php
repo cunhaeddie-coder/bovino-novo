@@ -156,9 +156,14 @@ class RevisaoAdversarialTest extends TestCase
         $venda = $vendas->registrar($usuario, $fazenda, $animais, 500.00, '2026-01-01 10:00:00', 'venda-original');
 
         // Duas correções SEQUENCIAIS (nem precisa de corrida real pra provar
-        // a lógica) pedindo a MESMA remoção — a5 sai nas duas.
+        // a lógica) pedindo a MESMA remoção — a5 sai nas duas. Desde a
+        // decisão V2 do produtor (28/10/2026, correções encadeiam) a segunda,
+        // feita sobre a versão já corrigida, é recusada antes de tocar o lote.
         $vendas->corrigir($usuario, $venda['venda']->id, [$a1, $a2, $a3, $a4], 400.00, 'correcao-1');
-        $vendas->corrigir($usuario, $venda['venda']->id, [$a1, $a2, $a3, $a4], 400.00, 'correcao-2');
+        $this->assertThrows(
+            fn () => $vendas->corrigir($usuario, $venda['venda']->id, [$a1, $a2, $a3, $a4], 400.00, 'correcao-2'),
+            DomainException::class
+        );
 
         $loteDepois = Lote::find($lote);
         $this->assertSame(1, $loteDepois->qtd_animais, 'a5 é um único animal físico — só pode creditar o lote uma vez, mesmo com duas correções pedindo a mesma coisa');
