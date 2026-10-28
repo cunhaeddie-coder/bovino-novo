@@ -48,12 +48,27 @@ class ProducaoLeiteiraHttpTest extends TestCase
             'data_producao' => '2026-09-30 06:00:00',
             'quantidade_total' => 20,
             'quantidade_vendida' => 15,
-            'quantidade_bezerro' => 5,
             'chave_idempotencia' => 'leite-http-1',
         ]);
 
         $resposta->assertStatus(201);
         $resposta->assertJsonPath('reenvio_detectado', false);
+    }
+
+    /** O lançamento normal (decisão do produtor, 28/10/2026): o total de todas as vacas, sem mandar vaca. */
+    public function test_registrar_total_do_rebanho_sem_vaca_via_http_retorna_201(): void
+    {
+        $resposta = $this->auth()->postJson('/api/producoes-leiteiras', [
+            'fazenda_id' => $this->fazenda,
+            'data_producao' => '2026-09-30 06:00:00',
+            'quantidade_total' => 380,
+            'quantidade_vendida' => 360,
+            'chave_idempotencia' => 'leite-http-rebanho',
+        ]);
+
+        $resposta->assertStatus(201);
+        $resposta->assertJsonPath('producao.animal_id', null);
+        $resposta->assertJsonMissingPath('producao.quantidade_bezerro');
     }
 
     public function test_registrar_producao_leiteira_excedendo_total_retorna_422(): void
@@ -65,8 +80,7 @@ class ProducaoLeiteiraHttpTest extends TestCase
             'animal_id' => $vaca->id,
             'data_producao' => '2026-09-30 06:00:00',
             'quantidade_total' => 20,
-            'quantidade_vendida' => 15,
-            'quantidade_bezerro' => 10,
+            'quantidade_vendida' => 25,
             'chave_idempotencia' => 'leite-http-2',
         ]);
 

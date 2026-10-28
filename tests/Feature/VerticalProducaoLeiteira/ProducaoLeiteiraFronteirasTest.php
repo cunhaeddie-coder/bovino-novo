@@ -37,7 +37,7 @@ class ProducaoLeiteiraFronteirasTest extends TestCase
     public function test_chave_idempotencia_vazia_e_recusada(): void
     {
         $this->assertThrows(
-            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, 4.0, ''),
+            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, ''),
             DomainException::class
         );
     }
@@ -48,7 +48,7 @@ class ProducaoLeiteiraFronteirasTest extends TestCase
         $vacaDeOutraFazenda = Animal::create(['fazenda_id' => $outraFazenda, 'lote_id' => null, 'custo_aquisicao' => 5000, 'status' => 'ativo'])->id;
 
         $this->assertThrows(
-            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $vacaDeOutraFazenda, '2026-01-01 18:00:00', 10.0, 6.0, 4.0, 'x'),
+            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $vacaDeOutraFazenda, '2026-01-01 18:00:00', 10.0, 6.0, 'x'),
             DomainException::class
         );
     }
@@ -56,7 +56,7 @@ class ProducaoLeiteiraFronteirasTest extends TestCase
     public function test_quantidade_total_zero_ou_negativa_e_recusada(): void
     {
         $this->assertThrows(
-            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 0, 0, 0, 'y'),
+            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 0, 0, 'y'),
             DomainException::class
         );
     }
@@ -64,15 +64,15 @@ class ProducaoLeiteiraFronteirasTest extends TestCase
     public function test_quantidade_vendida_negativa_e_recusada(): void
     {
         $this->assertThrows(
-            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, -1, 4.0, 'z'),
+            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, -1, 'z'),
             DomainException::class
         );
     }
 
-    public function test_soma_excedendo_total_e_recusada_inv039(): void
+    public function test_vendido_acima_do_total_e_recusado_inv039(): void
     {
         $this->assertThrows(
-            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 7.0, 5.0, 'w'),
+            fn () => $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 12.0, 'w'),
             LogicException::class
         );
     }
@@ -82,7 +82,7 @@ class ProducaoLeiteiraFronteirasTest extends TestCase
         $mariazinha = Usuario::create(['nome' => 'Mariazinha'])->id;
 
         $this->assertThrows(
-            fn () => $this->producoes->registrar($mariazinha, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, 4.0, 'ataque-mariazinha'),
+            fn () => $this->producoes->registrar($mariazinha, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, 'ataque-mariazinha'),
             DomainException::class
         );
     }

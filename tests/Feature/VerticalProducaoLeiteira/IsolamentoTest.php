@@ -26,7 +26,7 @@ class IsolamentoTest extends TestCase
         $vaca = Animal::create(['fazenda_id' => $fazendaA, 'lote_id' => null, 'custo_aquisicao' => 5000, 'status' => 'ativo'])->id;
 
         $service = app(ProducaoLeiteiraService::class);
-        $registro = $service->registrar($jose, $fazendaA, $vaca, '2026-01-01 18:00:00', 10.0, 6.0, 4.0, 'producao-1');
+        $registro = $service->registrar($jose, $fazendaA, $vaca, '2026-01-01 18:00:00', 10.0, 6.0, 'producao-1');
 
         $this->assertNull($service->buscar($mariazinha, $registro['producao']->id));
         $this->assertNotNull($service->buscar($jose, $registro['producao']->id));
@@ -44,8 +44,8 @@ class IsolamentoTest extends TestCase
         $vacaB = Animal::create(['fazenda_id' => $fazendaB, 'lote_id' => null, 'custo_aquisicao' => 5000, 'status' => 'ativo'])->id;
 
         $service = app(ProducaoLeiteiraService::class);
-        $resultadoA = $service->registrar($jose, $fazendaA, $vacaA, '2026-01-01 18:00:00', 10.0, 6.0, 4.0, 'chave-igual');
-        $resultadoB = $service->registrar($mariazinha, $fazendaB, $vacaB, '2026-01-01 18:00:00', 8.0, 8.0, 0.0, 'chave-igual');
+        $resultadoA = $service->registrar($jose, $fazendaA, $vacaA, '2026-01-01 18:00:00', 10.0, 6.0, 'chave-igual');
+        $resultadoB = $service->registrar($mariazinha, $fazendaB, $vacaB, '2026-01-01 18:00:00', 8.0, 8.0, 'chave-igual');
 
         $this->assertFalse($resultadoB['reenvio_detectado']);
         $this->assertNotSame($resultadoA['producao']->id, $resultadoB['producao']->id);

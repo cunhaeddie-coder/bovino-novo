@@ -12,10 +12,13 @@ use Illuminate\Database\QueryException;
 /**
  * O núcleo do Vertical 14 (Produção Leiteira), nascido de
  * VERTICAL-PRODUCAO-LEITEIRA.md, traduzindo
- * SCHEMA-CONTRATO-PRODUCAO-LEITEIRA.md pra código real. Primeira medição
- * periódica por Animal individual do Bovino Novo — nenhum mecanismo
- * pré-existente pra reaproveitar. INSERT puro, sem lockForUpdate() (mesma
- * categoria de risco de Nascimento/Folha de Pagamento/Arrendamento).
+ * SCHEMA-CONTRATO-PRODUCAO-LEITEIRA.md pra código real. INSERT puro, sem
+ * lockForUpdate() (mesma categoria de risco de Nascimento/Folha de
+ * Pagamento/Arrendamento).
+ *
+ * Decisão do produtor (28/10/2026): o lançamento normal é o total de todas
+ * as vacas juntas (animal_id null); uma vaca separada só raramente. O leite
+ * pro bezerro saiu: ele mama no peito, ninguém mede.
  */
 class ProducaoLeiteiraService
 {
@@ -36,7 +39,7 @@ class ProducaoLeiteiraService
         return $producao;
     }
 
-    public function registrar(int $usuarioId, int $fazendaId, int $animalId, string $dataProducao, float $quantidadeTotal, float $quantidadeVendida, float $quantidadeBezerro, string $chaveIdempotencia): array
+    public function registrar(int $usuarioId, int $fazendaId, ?int $animalId, string $dataProducao, float $quantidadeTotal, float $quantidadeVendida, string $chaveIdempotencia): array
     {
         $this->garantirRelacaoComFazenda($usuarioId, $fazendaId);
 
@@ -48,7 +51,7 @@ class ProducaoLeiteiraService
             return ['reenvio_detectado' => true, 'producao' => $existente];
         }
 
-        if (! Animal::where('fazenda_id', $fazendaId)->where('id', $animalId)->exists()) {
+        if ($animalId !== null && ! Animal::where('fazenda_id', $fazendaId)->where('id', $animalId)->exists()) {
             throw new DomainException("Animal #{$animalId} não encontrado ou não pertence a esta Fazenda.");
         }
 
@@ -56,19 +59,19 @@ class ProducaoLeiteiraService
             throw new DomainException("Produção Leiteira exige quantidade_total positiva (recebido: {$quantidadeTotal}).");
         }
 
-        if ($quantidadeVendida < 0 || $quantidadeBezerro < 0) {
-            throw new DomainException('quantidade_vendida e quantidade_bezerro não podem ser negativas.');
+        if ($quantidadeVendida < 0) {
+            throw new DomainException('quantidade_vendida não pode ser negativa.');
         }
 
-        // Achado real ao expor via HTTP (30/09/2026): esta soma só era
+        // Achado real ao expor via HTTP (30/09/2026): esta regra só era
         // validada pelo guard do Model (INV-039), que lança LogicException
         // crua — não capturada pelo handler de DomainException em
         // bootstrap/app.php, virava 500 em vez de 422. Mesma disciplina de
         // toda checagem de domínio no Service: falhar limpo antes da
         // transação, nunca deixar o guard de infraestrutura ser a única
         // defesa.
-        if (round($quantidadeVendida + $quantidadeBezerro, 2) > round($quantidadeTotal, 2)) {
-            throw new DomainException('quantidade_vendida + quantidade_bezerro não pode exceder quantidade_total (INV-039).');
+        if (round($quantidadeVendida, 2) > round($quantidadeTotal, 2)) {
+            throw new DomainException('quantidade_vendida não pode exceder quantidade_total (INV-039).');
         }
 
         try {
@@ -78,7 +81,6 @@ class ProducaoLeiteiraService
                 'data_producao' => $dataProducao,
                 'quantidade_total' => $quantidadeTotal,
                 'quantidade_vendida' => $quantidadeVendida,
-                'quantidade_bezerro' => $quantidadeBezerro,
                 'chave_idempotencia' => $chaveIdempotencia,
             ]);
 

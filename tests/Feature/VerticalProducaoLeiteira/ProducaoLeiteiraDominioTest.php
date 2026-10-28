@@ -15,9 +15,9 @@ use Tests\TestCase;
 /**
  * Teste de domínio do Vertical 14 (Produção Leiteira) — nasce de
  * VERTICAL-PRODUCAO-LEITEIRA.md e SCHEMA-CONTRATO-PRODUCAO-LEITEIRA.md.
- * Reproduz LAB-SA-020 (produção diária de leite, rastreável por vaca,
- * distinguindo litro vendido de litro pro bezerro — o diferencial do
- * módulo v2 que o Atual escondia atrás de um plano pago).
+ * Reproduz LAB-SA-020 (produção diária de leite). Decisão do produtor
+ * (28/10/2026): o lançamento normal é o total de todas as vacas juntas, uma
+ * vaca separada só raramente, e o leite pro bezerro não se registra.
  */
 class ProducaoLeiteiraDominioTest extends TestCase
 {
@@ -41,16 +41,30 @@ class ProducaoLeiteiraDominioTest extends TestCase
         $this->vaca = Animal::create(['fazenda_id' => $this->fazenda, 'lote_id' => null, 'custo_aquisicao' => 5000, 'status' => 'ativo'])->id;
     }
 
-    /** LAB-SA-020 — produção rastreável por vaca, litro vendido separado do litro pro bezerro. */
-    public function test_registro_de_producao_distingue_vendido_de_bezerro(): void
+    /** LAB-SA-020 — 40 vacas ordenhadas juntas: o lançamento é o total do dia, sem escolher vaca. */
+    public function test_total_de_todas_as_vacas_juntas_sem_escolher_vaca(): void
     {
-        $registro = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 7.0, 3.0, 'producao-1');
+        $registro = $this->producoes->registrar($this->jose, $this->fazenda, null, '2026-01-01 18:00:00', 380.0, 380.0, 'producao-rebanho');
+
+        $this->assertFalse($registro['reenvio_detectado']);
+        $this->assertNull($registro['producao']->animal_id);
+        $this->assertEqualsWithDelta(380.0, (float) $registro['producao']->quantidade_total, 0.01);
+        $this->assertEqualsWithDelta(380.0, (float) $registro['producao']->quantidade_vendida, 0.01);
+        $this->assertArrayNotHasKey('quantidade_bezerro', $registro['producao']->fresh()->toArray());
+
+        $evento = EventoDominio::where('fazenda_id', $this->fazenda)->where('tipo', 'producao_leiteira_registrada')->first();
+        $this->assertNotNull($evento);
+    }
+
+    /** O caso raro: uma vaca separada, com o que dela foi vendido. */
+    public function test_uma_vaca_separada_continua_possivel(): void
+    {
+        $registro = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 7.0, 'producao-1');
 
         $this->assertFalse($registro['reenvio_detectado']);
         $this->assertSame($this->vaca, $registro['producao']->animal_id);
         $this->assertEqualsWithDelta(10.0, (float) $registro['producao']->quantidade_total, 0.01);
         $this->assertEqualsWithDelta(7.0, (float) $registro['producao']->quantidade_vendida, 0.01);
-        $this->assertEqualsWithDelta(3.0, (float) $registro['producao']->quantidade_bezerro, 0.01);
 
         $evento = EventoDominio::where('fazenda_id', $this->fazenda)->where('tipo', 'producao_leiteira_registrada')->first();
         $this->assertNotNull($evento);
@@ -58,14 +72,14 @@ class ProducaoLeiteiraDominioTest extends TestCase
 
     public function test_producao_sem_venda_e_valida_zero_e_valor_aceito(): void
     {
-        $registro = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 8.0, 0.0, 8.0, 'producao-2');
+        $registro = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 8.0, 0.0, 'producao-2');
         $this->assertFalse($registro['reenvio_detectado']);
     }
 
     public function test_duas_producoes_no_mesmo_dia_sao_permitidas_chaves_diferentes(): void
     {
-        $manha = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 06:00:00', 5.0, 3.0, 2.0, 'producao-manha');
-        $tarde = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 5.0, 4.0, 1.0, 'producao-tarde');
+        $manha = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 06:00:00', 5.0, 3.0, 'producao-manha');
+        $tarde = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 5.0, 4.0, 'producao-tarde');
 
         $this->assertFalse($manha['reenvio_detectado']);
         $this->assertFalse($tarde['reenvio_detectado']);
@@ -74,8 +88,8 @@ class ProducaoLeiteiraDominioTest extends TestCase
 
     public function test_reenvio_do_registro_e_idempotente(): void
     {
-        $primeiro = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, 4.0, 'producao-mesma-chave');
-        $segundo = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, 4.0, 'producao-mesma-chave');
+        $primeiro = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, 'producao-mesma-chave');
+        $segundo = $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 6.0, 'producao-mesma-chave');
 
         $this->assertTrue($segundo['reenvio_detectado']);
         $this->assertSame($primeiro['producao']->id, $segundo['producao']->id);
@@ -87,11 +101,11 @@ class ProducaoLeiteiraDominioTest extends TestCase
      * (LogicException crua), nunca pré-validada no Service. Corrigido pra
      * DomainException limpa, mesmo padrão de toda outra checagem aqui.
      */
-    public function test_soma_vendida_mais_bezerro_excedendo_total_e_recusada_com_domain_exception(): void
+    public function test_vendido_acima_do_total_e_recusado_com_domain_exception(): void
     {
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('INV-039');
 
-        $this->producoes->registrar($this->jose, $this->fazenda, $this->vaca, '2026-01-01 18:00:00', 10.0, 7.0, 5.0, 'producao-excede');
+        $this->producoes->registrar($this->jose, $this->fazenda, null, '2026-01-01 18:00:00', 10.0, 12.0, 'producao-excede');
     }
 }

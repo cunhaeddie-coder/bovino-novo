@@ -7,6 +7,7 @@ use App\Models\Fazenda;
 use App\Models\ProducaoLeiteira;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use LogicException;
 use Tests\TestCase;
 
@@ -31,7 +32,7 @@ class SchemaEstruturalTest extends TestCase
         $animal = $this->criarAnimal($fazenda->id);
         $producao = ProducaoLeiteira::create([
             'fazenda_id' => $fazenda->id, 'animal_id' => $animal->id, 'data_producao' => '2026-01-01 18:00:00',
-            'quantidade_total' => 10, 'quantidade_vendida' => 6, 'quantidade_bezerro' => 4, 'chave_idempotencia' => 'x',
+            'quantidade_total' => 10, 'quantidade_vendida' => 6, 'chave_idempotencia' => 'x',
         ]);
 
         $this->assertThrows(
@@ -40,7 +41,7 @@ class SchemaEstruturalTest extends TestCase
         );
     }
 
-    public function test_soma_vendida_mais_bezerro_nao_pode_exceder_total_inv039(): void
+    public function test_vendido_nao_pode_exceder_total_inv039(): void
     {
         $fazenda = Fazenda::create(['nome' => 'A']);
         $animal = $this->criarAnimal($fazenda->id);
@@ -48,22 +49,35 @@ class SchemaEstruturalTest extends TestCase
         $this->assertThrows(
             fn () => ProducaoLeiteira::create([
                 'fazenda_id' => $fazenda->id, 'animal_id' => $animal->id, 'data_producao' => '2026-01-01 18:00:00',
-                'quantidade_total' => 10, 'quantidade_vendida' => 6, 'quantidade_bezerro' => 5, 'chave_idempotencia' => 'x',
+                'quantidade_total' => 10, 'quantidade_vendida' => 11, 'chave_idempotencia' => 'x',
             ]),
             LogicException::class
         );
     }
 
-    public function test_soma_exata_ao_total_e_aceita(): void
+    public function test_vendido_igual_ao_total_e_aceito(): void
     {
         $fazenda = Fazenda::create(['nome' => 'A']);
         $animal = $this->criarAnimal($fazenda->id);
         $producao = ProducaoLeiteira::create([
             'fazenda_id' => $fazenda->id, 'animal_id' => $animal->id, 'data_producao' => '2026-01-01 18:00:00',
-            'quantidade_total' => 10, 'quantidade_vendida' => 6, 'quantidade_bezerro' => 4, 'chave_idempotencia' => 'x',
+            'quantidade_total' => 10, 'quantidade_vendida' => 10, 'chave_idempotencia' => 'x',
         ]);
 
         $this->assertEqualsWithDelta(10.0, (float) $producao->quantidade_total, 0.01);
+    }
+
+    /** Decisão do produtor (28/10/2026): o total do rebanho não tem vaca, e o leite pro bezerro não existe mais. */
+    public function test_total_do_rebanho_sem_vaca_e_sem_coluna_do_bezerro(): void
+    {
+        $fazenda = Fazenda::create(['nome' => 'A']);
+        $producao = ProducaoLeiteira::create([
+            'fazenda_id' => $fazenda->id, 'animal_id' => null, 'data_producao' => '2026-01-01 18:00:00',
+            'quantidade_total' => 380, 'quantidade_vendida' => 380, 'chave_idempotencia' => 'x',
+        ]);
+
+        $this->assertNull($producao->fresh()->animal_id);
+        $this->assertFalse(Schema::hasColumn('producoes_leiteiras', 'quantidade_bezerro'));
     }
 
     public function test_producao_leiteira_e_unica_por_fazenda_e_chave_idempotencia(): void
@@ -72,13 +86,13 @@ class SchemaEstruturalTest extends TestCase
         $animal = $this->criarAnimal($fazenda->id);
         ProducaoLeiteira::create([
             'fazenda_id' => $fazenda->id, 'animal_id' => $animal->id, 'data_producao' => '2026-01-01 18:00:00',
-            'quantidade_total' => 10, 'quantidade_vendida' => 6, 'quantidade_bezerro' => 4, 'chave_idempotencia' => 'mesma-chave',
+            'quantidade_total' => 10, 'quantidade_vendida' => 6, 'chave_idempotencia' => 'mesma-chave',
         ]);
 
         $this->assertThrows(
             fn () => ProducaoLeiteira::create([
                 'fazenda_id' => $fazenda->id, 'animal_id' => $animal->id, 'data_producao' => '2026-01-02 18:00:00',
-                'quantidade_total' => 8, 'quantidade_vendida' => 8, 'quantidade_bezerro' => 0, 'chave_idempotencia' => 'mesma-chave',
+                'quantidade_total' => 8, 'quantidade_vendida' => 8, 'chave_idempotencia' => 'mesma-chave',
             ]),
             QueryException::class
         );

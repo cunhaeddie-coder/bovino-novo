@@ -10,25 +10,22 @@ class ProducaoLeiteira extends Model
 {
     protected $table = 'producoes_leiteiras';
 
-    protected $fillable = ['fazenda_id', 'animal_id', 'data_producao', 'quantidade_total', 'quantidade_vendida', 'quantidade_bezerro', 'chave_idempotencia'];
+    protected $fillable = ['fazenda_id', 'animal_id', 'data_producao', 'quantidade_total', 'quantidade_vendida', 'chave_idempotencia'];
 
     protected $casts = [
         'data_producao' => 'datetime',
         'quantidade_total' => 'decimal:2',
         'quantidade_vendida' => 'decimal:2',
-        'quantidade_bezerro' => 'decimal:2',
     ];
 
     protected static function booted(): void
     {
-        // SCHEMA-CONTRATO-PRODUCAO-LEITEIRA.md §3 — INV-039: a soma do
-        // leite vendido e do leite pro bezerro nunca excede o total
-        // produzido.
+        // INV-039 (revista em 28/10/2026, sem o leite pro bezerro): o leite
+        // vendido nunca excede o total ordenhado.
         $regraSoma = function (self $producao) {
-            $soma = round((float) $producao->quantidade_vendida + (float) $producao->quantidade_bezerro, 2);
-            if ($soma > round((float) $producao->quantidade_total, 2)) {
+            if (round((float) $producao->quantidade_vendida, 2) > round((float) $producao->quantidade_total, 2)) {
                 throw new LogicException(
-                    'ProducaoLeiteira.quantidade_vendida + quantidade_bezerro não pode exceder quantidade_total (INV-039).'
+                    'ProducaoLeiteira.quantidade_vendida não pode exceder quantidade_total (INV-039).'
                 );
             }
         };
