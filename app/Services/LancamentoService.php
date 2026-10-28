@@ -8,8 +8,10 @@ use App\Models\FormaPagamento;
 use App\Models\Lancamento;
 use App\Models\ObrigacaoFinanceira;
 use App\Models\Usuario;
+use App\Models\Venda;
 use DomainException;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -87,18 +89,38 @@ class LancamentoService
             return;
         }
 
+        $tipo = $forma->obrigacaoFinanceira->direcao === 'a_receber' ? 'entrada' : 'saida';
+        $valor = (float) $forma->valor_liquidado_reais;
+        $descricao = $this->descricaoParaObrigacao($forma->obrigacaoFinanceira);
+
+        // V1 (28/10/2026) — venda corrigida vale uma vez só: o lançamento leva
+        // a Carteira até o valor da versão atual, descontando o que as outras
+        // versões da mesma venda já lançaram. Nunca o valor cheio de novo.
+        if ($forma->obrigacaoFinanceira->venda_id !== null) {
+            $versoes = $this->versoesDaVenda(Venda::findOrFail($forma->obrigacaoFinanceira->venda_id));
+            if ($versoes->count() > 1) {
+                $diferenca = round((float) $versoes->last()->valor_bruto - $this->jaLancadoNaCarteira($versoes), 2);
+                if ($diferenca == 0.0) {
+                    return;
+                }
+                $tipo = $diferenca > 0 ? 'entrada' : 'saida';
+                $valor = abs($diferenca);
+                $descricao = "Venda #{$versoes->first()->id} corrigida (versão atual #{$versoes->last()->id}): ajuste";
+            }
+        }
+
         try {
-            DB::transaction(function () use ($forma, $fazenda) {
+            DB::transaction(function () use ($forma, $fazenda, $tipo, $valor, $descricao) {
                 $conta = app(ContaService::class)->buscarOuCriarContaBovino($fazenda->titular_id);
 
                 Lancamento::create([
                     'conta_id' => $conta->id,
-                    'tipo' => $forma->obrigacaoFinanceira->direcao === 'a_receber' ? 'entrada' : 'saida',
-                    'valor' => $forma->valor_liquidado_reais,
+                    'tipo' => $tipo,
+                    'valor' => $valor,
                     // INV-008 — o dia em que o dinheiro entrou ou saiu, nunca o
                     // dia em que a varredura processou o evento.
                     'data_lancamento' => $forma->pago_em,
-                    'descricao' => $this->descricaoParaObrigacao($forma->obrigacaoFinanceira),
+                    'descricao' => $descricao,
                     'origem' => 'automatico',
                     'forma_pagamento_id' => $forma->id,
                     'chave_idempotencia' => "forma-pagamento-{$forma->id}",
@@ -111,6 +133,31 @@ class LancamentoService
             // Reprocessamento do mesmo evento (varredura + fila disputando
             // o mesmo EventoDominio) — o Lançamento já existe, nada a fazer.
         }
+    }
+
+    /** @return Collection<int, Venda> da venda original até a versão atual, em ordem */
+    private function versoesDaVenda(Venda $venda): Collection
+    {
+        $raiz = $venda;
+        while ($raiz->original !== null) {
+            $raiz = $raiz->original;
+        }
+
+        $versoes = collect([$raiz]);
+        while ($versoes->last()->correcao !== null) {
+            $versoes->push($versoes->last()->correcao);
+        }
+
+        return $versoes;
+    }
+
+    /** @param Collection<int, Venda> $versoes */
+    private function jaLancadoNaCarteira(Collection $versoes): float
+    {
+        $formas = FormaPagamento::whereHas('obrigacaoFinanceira', fn ($obrigacao) => $obrigacao->whereIn('venda_id', $versoes->pluck('id')))->pluck('id');
+
+        return (float) Lancamento::whereIn('forma_pagamento_id', $formas)->get()
+            ->sum(fn (Lancamento $lancamento) => $lancamento->tipo === 'entrada' ? (float) $lancamento->valor : -(float) $lancamento->valor);
     }
 
     private function descricaoParaObrigacao(ObrigacaoFinanceira $obrigacao): string

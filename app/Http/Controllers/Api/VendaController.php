@@ -27,7 +27,9 @@ class VendaController extends Controller
             throw new DomainException("Operação recusada: usuário sem relação com a Fazenda {$dados['fazenda_id']}.");
         }
 
-        $vendas = Venda::where('fazenda_id', $dados['fazenda_id'])->orderByDesc('data_venda')->get();
+        // V1 (28/10/2026): cada venda aparece uma vez, pela versão atual; uma
+        // correção traz venda_original_id apontando pra versão que substituiu.
+        $vendas = Venda::atuais()->where('fazenda_id', $dados['fazenda_id'])->orderByDesc('data_venda')->get();
 
         return response()->json(['vendas' => $vendas]);
     }

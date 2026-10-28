@@ -53,9 +53,24 @@ class Venda extends Model
         return $this->belongsTo(Fazenda::class);
     }
 
+    // venda_original_id aponta pra versão que esta corrige (decisão do
+    // produtor, 28/10/2026, V2: correções encadeiam, cada uma sobre a
+    // versão atual). Numa venda nunca corrigida, é a própria original.
     public function original(): BelongsTo
     {
         return $this->belongsTo(Venda::class, 'venda_original_id');
+    }
+
+    public function correcao(): HasOne
+    {
+        return $this->hasOne(Venda::class, 'venda_original_id');
+    }
+
+    // V1 (28/10/2026): a venda vale uma vez só, pela versão atual — a que
+    // nenhuma correção substituiu. Listas, receita e relatórios usam esta.
+    public function scopeAtuais(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('correcao');
     }
 
     public function obrigacaoFinanceira(): HasOne

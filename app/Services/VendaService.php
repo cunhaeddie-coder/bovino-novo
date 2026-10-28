@@ -209,17 +209,24 @@ class VendaService
 
     /**
      * Correção do fato Venda (VERTICAL-VENDA.md §3c / INV-026). NUNCA faz
-     * UPDATE na venda original — cria um novo registro que a referencia.
+     * UPDATE na versão corrigida — cria um novo registro que a referencia.
+     *
+     * Decisões do produtor (28/10/2026, VERTICAL-VENDA.md §12): corrigir é
+     * consertar um erro de registro (V1) — a venda passa a valer uma vez só,
+     * pela versão atual, na mesma data real da venda, e a Carteira recebe só
+     * a diferença (LancamentoService). Correções encadeiam (V2): só a versão
+     * atual pode ser corrigida, e a correção simultânea da mesma versão é
+     * recusada.
      *
      * Revisão adversarial (26/08/2026): $novosAnimalIds só pode REMOVER
-     * animais do conjunto original, nunca introduzir um id que a venda
-     * original nunca teve — VERTICAL-VENDA.md §3c/Caso B só descreve correção
-     * como redução (28→26), nunca expansão, e um id não pertencente ao
-     * original nunca passou por nenhuma checagem de disponibilidade/Fazenda.
-     * Aceitar isso sem validar permitia "anexar" um animal de qualquer
-     * Fazenda a uma correção sem nunca tocar o registro real desse animal.
+     * animais da versão corrigida, nunca introduzir um id que ela nunca teve
+     * — VERTICAL-VENDA.md §3c/Caso B só descreve correção como redução
+     * (28→26), nunca expansão, e um id não pertencente à venda nunca passou
+     * por nenhuma checagem de disponibilidade/Fazenda. Aceitar isso sem
+     * validar permitia "anexar" um animal de qualquer Fazenda a uma correção
+     * sem nunca tocar o registro real desse animal.
      */
-    public function corrigir(int $usuarioId, int $vendaOriginalId, array $novosAnimalIds, float $novoValorBruto, string $chaveIdempotencia): array
+    public function corrigir(int $usuarioId, int $vendaId, array $novosAnimalIds, float $novoValorBruto, string $chaveIdempotencia): array
     {
         // Gate de Decisão de Domínio do Vertical Compra (27/08/2026) —
         // mesma correção simétrica de registrar().
@@ -227,32 +234,46 @@ class VendaService
             throw new DomainException('chave_idempotencia não pode ser vazia.');
         }
 
-        $original = $this->buscar($usuarioId, $vendaOriginalId);
-        if (! $original) {
-            throw new DomainException("Venda original #{$vendaOriginalId} não encontrada ou sem relação com a Fazenda do usuário {$usuarioId}.");
+        $versao = $this->buscar($usuarioId, $vendaId);
+        if (! $versao) {
+            throw new DomainException("Venda #{$vendaId} não encontrada ou sem relação com a Fazenda do usuário {$usuarioId}.");
         }
-        $fazendaId = $original->fazenda_id;
-        $idsOriginais = $original->animal_ids;
+        $fazendaId = $versao->fazenda_id;
+        $idsDaVersao = $versao->animal_ids;
+
+        // Reenvio vem antes da checagem de versão atual: a versão já foi
+        // corrigida justamente por este mesmo pedido.
+        if ($existente = Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->first()) {
+            return ['reenvio_detectado' => true, 'venda' => $existente, 'correcao' => $existente];
+        }
 
         if ($novoValorBruto <= 0) {
             throw new DomainException("Correção de venda exige valor maior que zero (recebido: {$novoValorBruto}).");
         }
 
-        if (array_diff($novosAnimalIds, $idsOriginais)) {
+        if (empty($novosAnimalIds)) {
+            throw new DomainException('A correção mantém ao menos 1 animal na venda.');
+        }
+
+        if (array_diff($novosAnimalIds, $idsDaVersao)) {
             throw new DomainException(
-                'Correção só pode remover animais da venda original, nunca incluir um animal que não fazia parte dela.'
+                'Correção só pode remover animais da venda, nunca incluir um animal que não fazia parte dela.'
             );
         }
 
-        if ($existente = Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->first()) {
-            return ['reenvio_detectado' => true, 'venda' => $existente];
-        }
+        $this->garantirVersaoAtual($versao);
 
-        $idsQueSaem = array_values(array_diff($idsOriginais, $novosAnimalIds));
+        $idsQueSaem = array_values(array_diff($idsDaVersao, $novosAnimalIds));
 
         try {
-            return DB::transaction(function () use ($original, $fazendaId, $idsOriginais, $idsQueSaem, $novosAnimalIds, $novoValorBruto, $chaveIdempotencia, $vendaOriginalId) {
-                $custoUnitarioOriginal = $original->cpv / count($idsOriginais);
+            return DB::transaction(function () use ($versao, $fazendaId, $idsDaVersao, $idsQueSaem, $novosAnimalIds, $novoValorBruto, $chaveIdempotencia) {
+                // V2 — duas correções simultâneas da mesma versão: a segunda
+                // espera este lock, vê a primeira e é recusada. O UNIQUE em
+                // vendas.venda_original_id é a última barreira.
+                Venda::whereKey($versao->id)->lockForUpdate()->first();
+                $this->garantirVersaoAtual($versao);
+
+                $custoUnitarioOriginal = $versao->cpv / count($idsDaVersao);
 
                 if ($idsQueSaem) {
                     // bovino-lab/spikes/007-concorrencia-real-mysql/run_correcao.php,
@@ -285,16 +306,17 @@ class VendaService
                 $novoCpv = round($custoUnitarioOriginal * count($novosAnimalIds), 2);
                 $novaReceitaLiquida = round($novoValorBruto - $novoCpv - $deducaoFiscal, 2);
 
-                // GATE-DECISAO-DOMINIO-DATA-HORA.md — a correção é seu
-                // próprio fato novo (INV-026), sua data_venda é o momento
-                // real em que a correção acontece, nunca herdada da venda
-                // original (que já tem a sua própria).
+                // V1 (28/10/2026) — a correção conserta o registro de uma
+                // venda que aconteceu numa data real: a versão nova mantém
+                // essa data (INV-008). O momento da correção fica em
+                // created_at. Substitui a regra de 04/09 (GATE-DECISAO-
+                // DOMINIO-DATA-HORA.md), que datava a correção pelo clique.
                 $correcao = Venda::create([
                     'fazenda_id' => $fazendaId,
-                    'venda_original_id' => $vendaOriginalId,
+                    'venda_original_id' => $versao->id,
                     'chave_idempotencia' => $chaveIdempotencia,
                     'animal_ids' => $novosAnimalIds,
-                    'data_venda' => now(),
+                    'data_venda' => $versao->data_venda,
                     'valor_bruto' => $novoValorBruto,
                     'cpv' => $novoCpv,
                     'deducao_fiscal' => $deducaoFiscal,
@@ -310,7 +332,7 @@ class VendaService
                     'deducao_fiscal' => $deducaoFiscal,
                     'taxa_aplicada' => $taxaAplicada,
                     'fiscal_e_premissa' => $ehPremissa,
-                    'data_lancamento' => now(),
+                    'data_lancamento' => $versao->data_venda,
                 ]);
 
                 // SCHEMA-CONTRATO-INTELIGENCIA-MERCADO.md §5 — a correção é sua
@@ -323,7 +345,9 @@ class VendaService
                 // Mesmo padrão de registrar() — a correção é um novo fato
                 // (venda imutável, INV-026), então ganha sua própria
                 // Obrigação Financeira refletindo o valor bruto corrigido,
-                // nunca uma atualização da obrigação da venda original.
+                // nunca uma atualização da obrigação da versão anterior. A
+                // venda vale pela versão atual (Venda::atuais()); na Carteira,
+                // o lançamento desta forma é só a diferença (V1).
                 $novaObrigacao = ObrigacaoFinanceira::create([
                     'fazenda_id' => $fazendaId,
                     'venda_id' => $correcao->id,
@@ -331,17 +355,18 @@ class VendaService
                     'valor' => $novoValorBruto,
                 ]);
 
-                $this->criarFormaPagamentoAVista($novaObrigacao, $novoValorBruto, now()->toDateString());
+                $this->criarFormaPagamentoAVista($novaObrigacao, $novoValorBruto, $versao->data_venda->toDateString());
 
                 $this->registrarEvento('venda_corrigida', $fazendaId, $chaveIdempotencia, [
-                    'tipo' => 'venda_corrigida', 'venda_original_id' => $vendaOriginalId,
+                    'tipo' => 'venda_corrigida', 'venda_original_id' => $versao->id,
                     'correcao_id' => $correcao->id, 'fazenda_id' => $fazendaId,
                 ]);
 
                 return [
                     'reenvio_detectado' => false,
+                    'venda' => $correcao,
                     'correcao' => $correcao,
-                    'venda_original_id' => $vendaOriginalId,
+                    'venda_original_id' => $versao->id,
                     'ids_que_saem' => $idsQueSaem,
                     'novo_cpv' => $novoCpv,
                     'nova_deducao_fiscal' => $deducaoFiscal,
@@ -350,9 +375,25 @@ class VendaService
             });
         } catch (QueryException $e) {
             if ($this->violacaoDeUnicidade($e)) {
-                return ['reenvio_detectado' => true, 'venda' => Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->firstOrFail()];
+                $existente = Venda::where('fazenda_id', $fazendaId)->where('chave_idempotencia', $chaveIdempotencia)->first();
+                if ($existente) {
+                    return ['reenvio_detectado' => true, 'venda' => $existente, 'correcao' => $existente];
+                }
+                // UNIQUE em venda_original_id: outra correção da mesma versão
+                // entrou primeiro (V2).
+                $this->garantirVersaoAtual($versao);
             }
             throw $e;
+        }
+    }
+
+    // V2 (28/10/2026) — só a versão atual de uma venda pode ser corrigida;
+    // corrigir de novo é sempre sobre a correção mais recente.
+    private function garantirVersaoAtual(Venda $versao): void
+    {
+        $substituta = Venda::where('venda_original_id', $versao->id)->first();
+        if ($substituta) {
+            throw new DomainException("Esta venda acabou de ser corrigida (pela venda #{$substituta->id}). Abra a venda de novo para corrigir a versão atual.");
         }
     }
 
