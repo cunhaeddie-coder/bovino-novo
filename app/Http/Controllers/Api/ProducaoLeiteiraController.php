@@ -35,22 +35,20 @@ class ProducaoLeiteiraController extends Controller
     {
         $dados = $request->validate([
             'fazenda_id' => ['required', 'integer'],
-            'animal_id' => ['required', 'integer'],
+            'animal_id' => ['nullable', 'integer'],
             'data_producao' => ['required', 'string'],
             'quantidade_total' => ['required', 'numeric'],
             'quantidade_vendida' => ['required', 'numeric'],
-            'quantidade_bezerro' => ['required', 'numeric'],
             'chave_idempotencia' => ['required', 'string'],
         ]);
 
         $resultado = $this->producoes->registrar(
             $request->user()->id,
             $dados['fazenda_id'],
-            $dados['animal_id'],
+            isset($dados['animal_id']) ? (int) $dados['animal_id'] : null,
             $dados['data_producao'],
             (float) $dados['quantidade_total'],
             (float) $dados['quantidade_vendida'],
-            (float) $dados['quantidade_bezerro'],
             $dados['chave_idempotencia']
         );
 
