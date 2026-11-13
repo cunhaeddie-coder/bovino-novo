@@ -58,7 +58,10 @@ if [ -f "$R2_ENV" ]; then
     export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
            RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_BACKUP_ACCESS_KEY_ID" \
            RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_BACKUP_SECRET_ACCESS_KEY" \
-           RCLONE_CONFIG_R2_ENDPOINT="$R2_BACKUP_ENDPOINT" RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true
+           RCLONE_CONFIG_R2_ENDPOINT="$R2_BACKUP_ENDPOINT" RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true \
+           RCLONE_CONFIG_R2_NO_HEAD=true
+    # NO_HEAD: o rclone 1.60 da KVM4 relê o arquivo com ?versionId= depois do envio, e o R2 responde 501 (o envio
+    # já deu 200, com MD5 conferido). Sem isso, toda 1ª tentativa falha e só a 2ª passa (visto em 13/11/2026).
     if rclone copy "$FILE" "r2:bovino-lab-backups/" --quiet 2>>"$LOG"; then
         log "Enviado para R2 (bovino-lab-backups)"
         rclone delete "r2:bovino-lab-backups/" --min-age 30d --quiet 2>>"$LOG" || true
